@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'brand_colors.dart';
-import 'home_page.dart';
+import 'router/app_router.dart';
 
 /// Login layout inspired by the reference: logo + name, soft-filled fields, primary CTA.
 class LoginScreen extends StatefulWidget {
@@ -69,11 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onLogin() {
     FocusScope.of(context).unfocus();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => const MyHomePage(title: 'Capital Locums'),
-      ),
-    );
+    context.go(AppRoute.home);
   }
 
   @override

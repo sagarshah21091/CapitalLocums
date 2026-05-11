@@ -1,19 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 
 import 'brand_colors.dart';
+import 'router/app_router.dart';
 
-/// Loops the Lottie splash for [splashDuration], then replaces the route with [next].
+/// Loops the Lottie splash for [splashDuration], then navigates via [GoRouter].
 class SplashScreen extends StatefulWidget {
   const SplashScreen({
     super.key,
-    required this.next,
     this.splashDuration = const Duration(seconds: 4),
   });
 
-  final Widget next;
   final Duration splashDuration;
 
   @override
@@ -40,9 +40,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted || _navigated) return;
     _navigated = true;
     _redirectTimer?.cancel();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => widget.next),
-    );
+    context.go(AppRoute.login);
   }
 
   @override

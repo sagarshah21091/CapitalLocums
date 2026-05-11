@@ -6,16 +6,18 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:capitallocums/home_page.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Test home in isolation; full app starts on a timed splash (see SplashScreen).
     await tester.pumpWidget(
-      const MaterialApp(
-        home: MyHomePage(title: 'Flutter Demo Home Page'),
+      const ProviderScope(
+        child: MaterialApp(
+          home: MyHomePage(title: 'Flutter Demo Home Page'),
+        ),
       ),
     );
 

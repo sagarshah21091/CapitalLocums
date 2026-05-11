@@ -1,27 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'brand_colors.dart';
-import 'login_screen.dart';
-import 'splash_screen.dart';
+import 'router/app_router.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+    return MaterialApp.router(
       title: 'Capital Locums',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: BrandColors.locumsGreen),
         useMaterial3: true,
       ),
-      home: const SplashScreen(
-        next: LoginScreen(),
-      ),
+      routerConfig: router,
     );
   }
 }
