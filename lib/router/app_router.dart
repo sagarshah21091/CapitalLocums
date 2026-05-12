@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../forgot_password_screen.dart';
 import '../home_page.dart';
 import '../login_screen.dart';
 import '../register/register_screen.dart';
@@ -13,6 +14,7 @@ abstract final class AppRoute {
 
   static const splash = '/';
   static const login = '/login';
+  static const forgotPassword = '/forgot-password';
   static const register = '/register';
   static const home = '/home';
 }
@@ -31,6 +33,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoute.login,
         builder: (BuildContext context, GoRouterState state) {
           return const LoginScreen();
+        },
+      ),
+      GoRoute(
+        path: AppRoute.forgotPassword,
+        builder: (BuildContext context, GoRouterState state) {
+          return const ForgotPasswordScreen();
         },
       ),
       GoRoute(

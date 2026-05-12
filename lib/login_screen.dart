@@ -179,7 +179,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   TextButton(
-                                    onPressed: () {},
+                                    onPressed: () =>
+                                        context.push(AppRoute.forgotPassword),
                                     style: TextButton.styleFrom(
                                       padding: EdgeInsets.zero,
                                       minimumSize: Size.zero,
