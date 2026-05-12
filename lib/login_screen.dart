@@ -70,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onLogin() {
     FocusScope.of(context).unfocus();
-    context.go(AppRoute.home);
+    context.go(AppRoute.dashboard);
   }
 
   @override
