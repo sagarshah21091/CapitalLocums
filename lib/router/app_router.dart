@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../home_page.dart';
 import '../login_screen.dart';
+import '../register/register_screen.dart';
 import '../splash_screen.dart';
 
 /// Path segments for [GoRouter]; use with [context.go] / [context.push].
@@ -12,6 +13,7 @@ abstract final class AppRoute {
 
   static const splash = '/';
   static const login = '/login';
+  static const register = '/register';
   static const home = '/home';
 }
 
@@ -29,6 +31,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoute.login,
         builder: (BuildContext context, GoRouterState state) {
           return const LoginScreen();
+        },
+      ),
+      GoRoute(
+        path: AppRoute.register,
+        builder: (BuildContext context, GoRouterState state) {
+          return const RegisterScreen();
         },
       ),
       GoRoute(

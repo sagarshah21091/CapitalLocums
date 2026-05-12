@@ -9,4 +9,7 @@ abstract final class BrandColors {
 
   /// Richer green from the same animation (fills ≈ rgb 49, 170, 71); better on light surfaces.
   static const Color locumsGreen = Color(0xFF31AA47);
+
+  /// Primary blue for register CTA and auth links (matches web reference).
+  static const Color primaryBlue = Color(0xFF1E88E5);
 }

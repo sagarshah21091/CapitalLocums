@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Capital Locums needs camera access to capture documents for registration.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Capital Locums needs photo library access to attach documents for registration.</string>
 </dict>
 </plist>

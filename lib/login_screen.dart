@@ -205,7 +205,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     textAlign: TextAlign.right,
                                   ),
                                   TextButton(
-                                    onPressed: () {},
+                                    onPressed: () =>
+                                        context.push(AppRoute.register),
                                     style: TextButton.styleFrom(
                                       padding: EdgeInsets.zero,
                                       minimumSize: Size.zero,
