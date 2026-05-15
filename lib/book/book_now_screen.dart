@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Book shifts tab (placeholder).
+/// Find Shifts tab (placeholder).
 class BookNowScreen extends StatelessWidget {
   const BookNowScreen({super.key});
 
@@ -10,7 +10,7 @@ class BookNowScreen extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          'Book now',
+          'Find Shifts',
           style: Theme.of(context).textTheme.headlineSmall,
         ),
       ),

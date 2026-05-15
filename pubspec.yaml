@@ -38,6 +38,9 @@ dependencies:
   flutter_riverpod: ^3.3.1
   go_router: ^17.2.3
   image_picker: ^1.2.2
+  dio: ^5.9.0
+  shared_preferences: ^2.5.3
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:
@@ -63,6 +66,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - assets/lottie/splash.json
     - assets/branding/app_icon.png
 

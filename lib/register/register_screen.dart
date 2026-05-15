@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../brand_colors.dart';
+import '../env/app_env.dart';
 import '../router/app_router.dart';
 import 'register_documents_provider.dart';
+import 'register_location_autocomplete.dart';
+import 'register_location_provider.dart';
 
 enum _ImagePickSource { camera, gallery }
 
@@ -33,6 +36,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true;
   String _yourRole = 'Pharmacist';
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(registerLocationProvider.notifier).clear();
+    });
+  }
+
   static const _radius = 8.0;
   static const _pageBg = Color(0xFFF8F9FA);
   static const _border = Color(0xFFE0E0E0);
@@ -48,6 +60,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     (label: 'Professional reference 1', isRequired: true),
     (label: 'Professional reference 2', isRequired: true),
   ];
+
+  String? _validateLocation(String? v) {
+    final text = v?.trim() ?? '';
+    if (text.isEmpty) return 'Required';
+    if (AppEnv.googleMapsApiKey.isEmpty) {
+      return null;
+    }
+    final picked = ref.read(registerLocationProvider);
+    if (picked == null || picked.formattedAddress.trim() != text.trim()) {
+      return 'Choose a location from the suggestions';
+    }
+    return null;
+  }
 
   @override
   void dispose() {
@@ -176,6 +201,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     ref.read(registerDocumentNamesProvider.notifier).clearAll();
+    ref.read(registerLocationProvider.notifier).clear();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Registration submitted (demo).')),
     );
@@ -303,16 +329,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
                   _requiredLabel('Location', isRequired: true),
-                  TextFormField(
+                  RegisterLocationAutocomplete(
                     controller: _locationController,
                     decoration: _decoration('Search by address / area'),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Required' : null,
+                    validator: _validateLocation,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Start typing to search for locations',
+                    AppEnv.googleMapsApiKey.isEmpty
+                        ? 'Add GOOGLE_MAPS_API_KEY to .env for suggestions, or enter a location manually.'
+                        : 'Start typing to search — tap a suggestion to save coordinates locally.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                   ),
                   const SizedBox(height: 16),

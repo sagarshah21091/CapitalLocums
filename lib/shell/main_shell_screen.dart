@@ -7,7 +7,7 @@ class MainShellScreen extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  static const _titles = ['Dashboard', 'Book now', 'Settings'];
+  static const _titles = ['Dashboard', 'Find Shifts', 'Settings'];
 
   @override
   Widget build(BuildContext context) {
@@ -39,9 +39,9 @@ class MainShellScreen extends StatelessWidget {
             label: 'Dashboard',
           ),
           NavigationDestination(
-            icon: Icon(Icons.event_available_outlined),
-            selectedIcon: Icon(Icons.event_available),
-            label: 'Book now',
+            icon: Icon(Icons.manage_search_outlined),
+            selectedIcon: Icon(Icons.manage_search),
+            label: 'Find Shifts',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
