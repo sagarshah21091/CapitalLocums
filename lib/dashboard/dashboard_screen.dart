@@ -21,6 +21,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   static const _completedBlue = Color(0xFF1E88E5);
   static const _cancelledRed = Color(0xFFE53935);
 
+  static const _maxBookingsPerSection = 5;
+
   bool _loading = true;
   String? _error;
   List<LocumBooking> _bookings = [];
@@ -253,53 +255,64 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _upcomingPanel() {
-    final upcoming = _upcoming;
+    final upcomingAll = _upcoming;
+    final upcoming = upcomingAll.take(_maxBookingsPerSection).toList();
     return _Panel(
       icon: Icons.calendar_month_outlined,
       title: 'Upcoming Shifts (Next 7 Days)',
-      badge: upcoming.length,
+      badge: upcomingAll.length,
       badgeColor: _confirmedGreen,
       child: upcoming.isEmpty
           ? _emptyState(
               icon: Icons.calendar_today_outlined,
               message: 'No upcoming shifts in the next 7 days',
             )
-          : Column(
-              children: [
-                for (var i = 0; i < upcoming.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 12),
-                  _BookingCard(booking: upcoming[i], variant: _BookingVariant.confirmed),
-                ],
-              ],
+          : _bookingCardColumn(
+              items: upcoming,
+              variant: _BookingVariant.confirmed,
             ),
     );
   }
 
   Widget _historyPanel() {
-    final history = _history;
+    final historyAll = _history;
+    final history = historyAll.take(_maxBookingsPerSection).toList();
     return _Panel(
       icon: Icons.history,
       title: 'Booking History',
-      badge: history.length,
+      badge: historyAll.length,
       badgeColor: Colors.grey.shade700,
       child: history.isEmpty
           ? _emptyState(
               icon: Icons.history,
               message: 'No booking history yet',
             )
-          : Column(
-              children: [
-                for (var i = 0; i < history.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 12),
-                  _BookingCard(
-                    booking: history[i],
-                    variant: history[i].isCancelled
-                        ? _BookingVariant.cancelled
-                        : _BookingVariant.completed,
-                  ),
-                ],
-              ],
+          : _bookingCardColumn(
+              items: history,
+              variantFor: (b) => b.isCancelled
+                  ? _BookingVariant.cancelled
+                  : _BookingVariant.completed,
             ),
+    );
+  }
+
+  Widget _bookingCardColumn({
+    required List<LocumBooking> items,
+    _BookingVariant? variant,
+    _BookingVariant Function(LocumBooking)? variantFor,
+  }) {
+    return Column(
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
+          _BookingCard(
+            booking: items[i],
+            variant: variant ??
+                variantFor?.call(items[i]) ??
+                _BookingVariant.confirmed,
+          ),
+        ],
+      ],
     );
   }
 
