@@ -1,25 +1,38 @@
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Display names for the six locum document slots (PDF / Word / image).
-class RegisterDocumentNames extends Notifier<List<String?>> {
-  static const slotCount = 6;
+/// Document slots on the registration form (indexed 0..5).
+abstract final class RegisterDocSlot {
+  RegisterDocSlot._();
 
+  static const passport = 0;
+  static const visaWorkPermit = 1;
+  static const nationalInsurance = 2;
+  static const qualificationCert = 3;
+  static const professionalReference1 = 4;
+  static const professionalReference2 = 5;
+
+  static const count = 6;
+}
+
+/// Files chosen for locum uploads (multipart).
+class RegisterDocuments extends Notifier<List<XFile?>> {
   @override
-  List<String?> build() => List<String?>.filled(slotCount, null);
+  List<XFile?> build() => List<XFile?>.filled(RegisterDocSlot.count, null);
 
-  void setName(int index, String? name) {
+  void setFile(int index, XFile? file) {
     if (index < 0 || index >= state.length) return;
     state = [
-      for (var i = 0; i < state.length; i++) i == index ? name : state[i],
+      for (var i = 0; i < state.length; i++) i == index ? file : state[i],
     ];
   }
 
   void clearAll() {
-    state = List<String?>.filled(slotCount, null);
+    state = List<XFile?>.filled(RegisterDocSlot.count, null);
   }
 }
 
-final registerDocumentNamesProvider =
-    NotifierProvider<RegisterDocumentNames, List<String?>>(
-  RegisterDocumentNames.new,
+final registerDocumentsProvider =
+    NotifierProvider<RegisterDocuments, List<XFile?>>(
+  RegisterDocuments.new,
 );

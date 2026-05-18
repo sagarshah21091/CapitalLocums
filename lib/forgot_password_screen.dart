@@ -1,24 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'auth/auth_providers.dart';
+import 'auth/auth_repository.dart';
 import 'brand_colors.dart';
 import 'router/app_router.dart';
 
 /// Request password reset with email only; opened from [LoginScreen].
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+
+  bool _submitting = false;
 
   static const _radius = 20.0;
   static const _labelGrey = Color(0xFF9E9E9E);
   static const _textDark = Color(0xFF424242);
+
+  static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
@@ -55,18 +63,51 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         borderRadius: BorderRadius.circular(_radius),
         borderSide: const BorderSide(color: BrandColors.locumsGreen, width: 1.4),
       ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(_radius),
+        borderSide: BorderSide(color: Colors.red.shade400, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(_radius),
+        borderSide: BorderSide(color: Colors.red.shade600, width: 1.2),
+      ),
     );
   }
 
-  void _onSubmit() {
+  String? _validateEmail(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) {
+      return 'Please enter your email';
+    }
+    if (!_emailRegex.hasMatch(v)) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  }
+
+  Future<void> _onSubmit() async {
     FocusScope.of(context).unfocus();
-    if (!_formKey.currentState!.validate()) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('If an account exists, reset instructions will be sent.'),
-      ),
-    );
-    context.pop();
+    if (_submitting) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _submitting = true);
+    try {
+      final message = await ref.read(authRepositoryProvider).forgotPassword(
+            email: _emailController.text,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      context.pop();
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -81,13 +122,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: _textDark),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoute.login);
-            }
-          },
+          onPressed: _submitting
+              ? null
+              : () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(AppRoute.login);
+                  }
+                },
         ),
         title: const Text(
           'Forgot password',
@@ -117,16 +160,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.done,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 style: const TextStyle(fontSize: 16, color: _textDark),
                 decoration: _fieldDecoration(
                   label: 'Email',
                   hint: 'Enter your email',
                 ),
-                onFieldSubmitted: (_) => _onSubmit(),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  if (!v.contains('@')) return 'Enter a valid email';
-                  return null;
+                validator: _validateEmail,
+                onFieldSubmitted: (_) {
+                  if (!_submitting) _onSubmit();
                 },
               ),
               const SizedBox(height: 28),
@@ -147,8 +189,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       letterSpacing: 0.8,
                     ),
                   ),
-                  onPressed: _onSubmit,
-                  child: const Text('SEND RESET LINK'),
+                  onPressed: _submitting ? null : _onSubmit,
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('SEND RESET LINK'),
                 ),
               ),
             ],

@@ -1,17 +1,20 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../api/register_api.dart';
 import '../brand_colors.dart';
 import '../env/app_env.dart';
 import '../router/app_router.dart';
+import 'register_api_provider.dart';
 import 'register_documents_provider.dart';
 import 'register_location_autocomplete.dart';
 import 'register_location_provider.dart';
 
-enum _ImagePickSource { camera, gallery }
+enum _DocPickSource { camera, gallery, document }
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -34,6 +37,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _travelKmController = TextEditingController();
 
   bool _obscurePassword = true;
+  bool _submitting = false;
   String _yourRole = 'Pharmacist';
 
   @override
@@ -134,8 +138,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  Future<_ImagePickSource?> _askImagePickSource() {
-    return showDialog<_ImagePickSource>(
+  Future<_DocPickSource?> _askDocPickSource() {
+    return showDialog<_DocPickSource>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Add document'),
@@ -145,12 +149,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ListTile(
               leading: const Icon(Icons.camera_alt_outlined),
               title: const Text('Take a photo'),
-              onTap: () => Navigator.pop(ctx, _ImagePickSource.camera),
+              onTap: () => Navigator.pop(ctx, _DocPickSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
               title: const Text('Choose from gallery'),
-              onTap: () => Navigator.pop(ctx, _ImagePickSource.gallery),
+              onTap: () => Navigator.pop(ctx, _DocPickSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_file_outlined),
+              title: const Text('Browse files (PDF, Word, Excel, …)'),
+              onTap: () => Navigator.pop(ctx, _DocPickSource.document),
             ),
           ],
         ),
@@ -164,31 +173,78 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
+  String _locumRoleForApi() {
+    switch (_yourRole) {
+      case 'Technician':
+        return 'technician';
+      default:
+        return 'pharmacist';
+    }
+  }
+
   Future<void> _pickDocument(int index) async {
-    final source = await _askImagePickSource();
+    final source = await _askDocPickSource();
     if (!mounted || source == null) return;
 
+    if (source == _DocPickSource.document) {
+      FilePickerResult? result;
+      try {
+        result = await FilePicker.pickFiles(
+          allowMultiple: false,
+          type: FileType.any,
+        );
+      } on MissingPluginException {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'File picker isn’t linked yet. Stop the app completely (not hot '
+              'reload), then run: flutter clean && flutter pub get && flutter run. '
+              'On iOS also run: cd ios && pod install. Or use Camera / Gallery.',
+            ),
+          ),
+        );
+        return;
+      }
+      if (!mounted || result == null || result.files.isEmpty) return;
+      final p = result.files.first;
+      final path = p.path;
+      late final XFile file;
+      if (path != null && path.trim().isNotEmpty) {
+        file = XFile(path.trim(), name: p.name);
+      } else if (p.bytes != null && p.bytes!.isNotEmpty) {
+        file = XFile.fromData(p.bytes!, name: p.name);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not read that file. Try another.'),
+          ),
+        );
+        return;
+      }
+      ref.read(registerDocumentsProvider.notifier).setFile(index, file);
+      return;
+    }
+
     final XFile? image = await _imagePicker.pickImage(
-      source: source == _ImagePickSource.camera
+      source: source == _DocPickSource.camera
           ? ImageSource.camera
           : ImageSource.gallery,
-      imageQuality: 85,
+      imageQuality: 60,
     );
     if (!mounted || image == null) return;
 
-    var label = image.name.trim();
-    if (label.isEmpty) {
-      label = 'Photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    }
-    ref.read(registerDocumentNamesProvider.notifier).setName(index, label);
+    ref.read(registerDocumentsProvider.notifier).setFile(index, image);
   }
 
-  void _onRegister() {
+  Future<void> _onRegister() async {
+    if (_submitting) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final files = ref.read(registerDocumentNamesProvider);
+    final docs = ref.read(registerDocumentsProvider);
     for (var i = 0; i < _docSlots.length; i++) {
-      if (_docSlots[i].isRequired && (files[i] == null || files[i]!.isEmpty)) {
+      if (_docSlots[i].isRequired && docs[i] == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -200,17 +256,72 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     }
 
-    ref.read(registerDocumentNamesProvider.notifier).clearAll();
-    ref.read(registerLocationProvider.notifier).clear();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Registration submitted (demo).')),
-    );
-    context.go(AppRoute.login);
+    final experience = int.tryParse(_experienceController.text.trim());
+    if (experience == null || experience < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid experience (years).')),
+      );
+      return;
+    }
+
+    final travelKm = double.tryParse(_travelKmController.text.trim());
+    if (travelKm == null || travelKm < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid travel distance (km).')),
+      );
+      return;
+    }
+
+    final picked = ref.read(registerLocationProvider);
+
+    setState(() => _submitting = true);
+    try {
+      final res = await ref.read(registerApiProvider).register(
+            name: _nameController.text,
+            email: _emailController.text,
+            password: _passwordController.text,
+            location: _locationController.text,
+            latitude: picked?.latitude ?? 0,
+            longitude: picked?.longitude ?? 0,
+            phone: _phoneController.text,
+            qualifications: _qualificationsController.text,
+            experienceYears: experience,
+            locumRole: _locumRoleForApi(),
+            travelDistanceKm: travelKm,
+            passport: docs[RegisterDocSlot.passport]!,
+            nationalInsurance: docs[RegisterDocSlot.nationalInsurance]!,
+            qualificationCert: docs[RegisterDocSlot.qualificationCert]!,
+            professionalReference1: docs[RegisterDocSlot.professionalReference1]!,
+            professionalReference2: docs[RegisterDocSlot.professionalReference2]!,
+            visaWorkPermit: docs[RegisterDocSlot.visaWorkPermit],
+          );
+
+      if (!mounted) return;
+      ref.read(registerDocumentsProvider.notifier).clearAll();
+      ref.read(registerLocationProvider.notifier).clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            res.message?.trim().isNotEmpty == true
+                ? res.message!.trim()
+                : 'User registered successfully',
+          ),
+        ),
+      );
+      context.go(AppRoute.login);
+    } on RegisterApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final fileNames = ref.watch(registerDocumentNamesProvider);
+    final docFiles = ref.watch(registerDocumentsProvider);
     final wide = MediaQuery.sizeOf(context).width >= 720;
 
     return Scaffold(
@@ -446,12 +557,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 28),
                   _DocumentsCard(
                     docSlots: _docSlots,
-                    fileNames: fileNames,
+                    docFiles: docFiles,
                     onPick: _pickDocument,
                     onClear: (index) {
                       ref
-                          .read(registerDocumentNamesProvider.notifier)
-                          .setName(index, null);
+                          .read(registerDocumentsProvider.notifier)
+                          .setFile(index, null);
                     },
                     borderColor: _border,
                     radius: _radius,
@@ -468,14 +579,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           borderRadius: BorderRadius.circular(_radius),
                         ),
                       ),
-                      onPressed: _onRegister,
-                      child: const Text(
-                        'Register',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      onPressed: _submitting ? null : _onRegister,
+                      child: _submitting
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Register',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -589,7 +709,7 @@ class _RegisterHeader extends StatelessWidget {
 class _DocumentsCard extends StatelessWidget {
   const _DocumentsCard({
     required this.docSlots,
-    required this.fileNames,
+    required this.docFiles,
     required this.onPick,
     required this.onClear,
     required this.borderColor,
@@ -597,7 +717,7 @@ class _DocumentsCard extends StatelessWidget {
   });
 
   final List<({String label, bool isRequired})> docSlots;
-  final List<String?> fileNames;
+  final List<XFile?> docFiles;
   final void Function(int index) onPick;
   final void Function(int index) onClear;
   final Color borderColor;
@@ -625,7 +745,7 @@ class _DocumentsCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Take a photo or choose an image from your gallery.',
+            'Photos, scans, PDF, Word or Excel.',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
           ),
           const SizedBox(height: 16),
@@ -654,9 +774,9 @@ class _DocumentsCard extends StatelessWidget {
         _DocUploadRow(
                 label: slot.label,
                 isRequired: slot.isRequired,
-                fileName: fileNames[i],
+                fileName: docFiles[i]?.name,
                 onChoose: () => onPick(i),
-                onClear: fileNames[i] != null
+                onClear: docFiles[i] != null
                     ? () => onClear(i)
                     : null,
                 borderColor: borderColor,
