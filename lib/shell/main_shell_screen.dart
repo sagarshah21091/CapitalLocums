@@ -13,9 +13,13 @@ class MainShellScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final index = navigationShell.currentIndex;
     return Scaffold(
+      backgroundColor: index == 0 ? const Color(0xFFF8F9FA) : null,
       appBar: AppBar(
-        title: Text(_titles[index]),
+        title: index == 0 ? const SizedBox.shrink() : Text(_titles[index]),
         centerTitle: false,
+        backgroundColor: index == 0 ? const Color(0xFFF8F9FA) : null,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
