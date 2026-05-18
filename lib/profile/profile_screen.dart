@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_constants.dart';
 import '../api/models/profile_models.dart';
@@ -367,25 +368,46 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         lower.endsWith('.bmp');
   }
 
-  void _previewDocument(ProfileDocument doc) {
+  static bool _isPdf(String fileName) =>
+      fileName.toLowerCase().endsWith('.pdf');
+
+  static IconData _documentIcon(String fileName) {
+    if (_isPdf(fileName)) return Icons.picture_as_pdf_outlined;
+    return Icons.insert_drive_file_outlined;
+  }
+
+  Future<void> _openDocumentExternally(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid document link.')),
+      );
+      return;
+    }
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open document.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open document: $e')),
+      );
+    }
+  }
+
+  Future<void> _previewDocument(ProfileDocument doc) async {
     final url = ApiConstants.documentUrl(doc.documentName);
     if (!_isPreviewableImage(doc.documentName)) {
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(doc.displayTitle),
-          content: SelectableText(
-            'Preview is not available for this file type.\n\n$url',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
+      await _openDocumentExternally(url);
       return;
     }
 
@@ -895,7 +917,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Tap a row to preview',
+            'Tap images to preview; other files open externally',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 12),
@@ -939,7 +961,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            if (_isPreviewableImage(doc.documentName)) ...[
+            if (_isPreviewableImage(doc.documentName))
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: Image.network(
@@ -955,9 +977,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         color: Colors.grey.shade500),
                   ),
                 ),
+              )
+            else
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Icon(
+                  _documentIcon(doc.documentName),
+                  color: _isPdf(doc.documentName)
+                      ? Colors.red.shade700
+                      : Colors.grey.shade600,
+                ),
               ),
-              const SizedBox(width: 10),
-            ],
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,7 +1027,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 Icons.visibility_outlined,
                 color: BrandColors.locumsGreen,
               ),
-              tooltip: 'View',
+              tooltip: _isPreviewableImage(doc.documentName)
+                  ? 'Preview'
+                  : 'Open',
               visualDensity: VisualDensity.compact,
             ),
           ],
