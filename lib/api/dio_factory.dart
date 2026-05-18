@@ -2,11 +2,13 @@ import 'package:dio/dio.dart';
 
 import 'api_constants.dart';
 import 'api_debug_logging.dart';
+import 'auth_interceptor.dart';
 
 /// Shared HTTP client for the Capital Locums API (JSON + multipart).
 Dio createAppDio({
   Duration connectTimeout = const Duration(seconds: 20),
   Duration receiveTimeout = const Duration(seconds: 60),
+  bool attachAuth = false,
 }) {
   final dio = Dio(
     BaseOptions(
@@ -18,6 +20,9 @@ Dio createAppDio({
       },
     ),
   );
+  if (attachAuth) {
+    dio.interceptors.add(AuthInterceptor());
+  }
   attachApiDebugLogging(dio);
   return dio;
 }

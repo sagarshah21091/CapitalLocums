@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../auth/auth_session.dart';
 import '../book/book_now_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../forgot_password_screen.dart';
@@ -32,10 +33,52 @@ abstract final class AppRoute {
 final GlobalKey<NavigatorState> rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
 
+bool _isPublicAuthRoute(String location) {
+  return location == AppRoute.login ||
+      location == AppRoute.register ||
+      location.startsWith(AppRoute.forgotPassword);
+}
+
+String? _authRedirect(AuthSessionStatus status, String location) {
+  if (status == AuthSessionStatus.unknown) {
+    return location == AppRoute.splash ? null : AppRoute.splash;
+  }
+
+  final loggedIn = status == AuthSessionStatus.authenticated;
+
+  if (loggedIn) {
+    if (location == AppRoute.splash || location == AppRoute.login) {
+      return AppRoute.dashboard;
+    }
+    return null;
+  }
+
+  // Not logged in
+  if (location == AppRoute.splash) {
+    return AppRoute.login;
+  }
+  if (_isPublicAuthRoute(location)) {
+    return null;
+  }
+  return AppRoute.login;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
+  final refreshListenable = ValueNotifier<int>(0);
+  ref.onDispose(refreshListenable.dispose);
+
+  ref.listen(authSessionProvider, (_, _) {
+    refreshListenable.value++;
+  });
+
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: AppRoute.splash,
+    refreshListenable: refreshListenable,
+    redirect: (BuildContext context, GoRouterState state) {
+      final status = ref.read(authSessionProvider);
+      return _authRedirect(status, state.matchedLocation);
+    },
     routes: [
       GoRoute(
         path: AppRoute.splash,

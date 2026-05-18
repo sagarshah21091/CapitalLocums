@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../auth/auth_session.dart';
 import '../router/app_router.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _confirmDelete(BuildContext context) async {
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -28,14 +30,40 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
     if (!context.mounted || ok != true) return;
+    await ref.read(authSessionProvider.notifier).logout();
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Account deletion (demo only).')),
     );
     context.go(AppRoute.login);
   }
 
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out'),
+        content: const Text('Are you sure you want to log out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    await ref.read(authSessionProvider.notifier).logout();
+    if (!context.mounted) return;
+    context.go(AppRoute.login);
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
@@ -50,7 +78,7 @@ class SettingsScreen extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.logout),
           title: const Text('Logout'),
-          onTap: () => context.go(AppRoute.login),
+          onTap: () => _logout(context, ref),
         ),
         const Divider(height: 1),
         ListTile(
@@ -59,7 +87,7 @@ class SettingsScreen extends StatelessWidget {
             'Delete account',
             style: TextStyle(color: Colors.red.shade700),
           ),
-          onTap: () => _confirmDelete(context),
+          onTap: () => _confirmDelete(context, ref),
         ),
       ],
     );

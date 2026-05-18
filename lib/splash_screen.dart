@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lottie/lottie.dart';
 
+import 'auth/auth_session.dart';
 import 'brand_colors.dart';
-import 'router/app_router.dart';
 
-/// Loops the Lottie splash for [splashDuration], then navigates via [GoRouter].
-class SplashScreen extends StatefulWidget {
+/// Loops the Lottie splash, hydrates session, then [GoRouter] redirect runs.
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({
     super.key,
     this.splashDuration = const Duration(seconds: 4),
@@ -17,30 +17,38 @@ class SplashScreen extends StatefulWidget {
   final Duration splashDuration;
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   Timer? _redirectTimer;
-  bool _navigated = false;
+  bool _hydrated = false;
 
   @override
   void initState() {
     super.initState();
-    _redirectTimer = Timer(widget.splashDuration, _goNext);
+    _redirectTimer = Timer(widget.splashDuration, _finishSplash);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _hydrateSession());
+  }
+
+  Future<void> _hydrateSession() async {
+    if (_hydrated) return;
+    await ref.read(authSessionProvider.notifier).hydrate();
+    if (mounted) {
+      setState(() => _hydrated = true);
+    }
+  }
+
+  Future<void> _finishSplash() async {
+    if (!mounted) return;
+    await _hydrateSession();
+    // Navigation is handled by GoRouter redirect after session is known.
   }
 
   @override
   void dispose() {
     _redirectTimer?.cancel();
     super.dispose();
-  }
-
-  void _goNext() {
-    if (!mounted || _navigated) return;
-    _navigated = true;
-    _redirectTimer?.cancel();
-    context.go(AppRoute.login);
   }
 
   @override

@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/api_constants.dart';
+import '../api/models/profile_models.dart';
 import '../brand_colors.dart';
+import '../env/app_env.dart';
+import '../register/register_location_autocomplete.dart';
+import '../register/register_location_provider.dart';
+import 'profile_providers.dart';
+import 'profile_repository.dart';
 
 class _ProfileData {
   const _ProfileData({
     required this.name,
+    required this.email,
     required this.phone,
     required this.location,
     required this.qualifications,
@@ -15,6 +24,7 @@ class _ProfileData {
   });
 
   final String name;
+  final String email;
   final String phone;
   final String location;
   final String qualifications;
@@ -23,18 +33,24 @@ class _ProfileData {
   final String travelKm;
 }
 
-/// Locum profile from portal reference: header, professional, service area, documents.
-class ProfileScreen extends StatefulWidget {
+/// Locum profile: header, professional, service area, documents (GET `/profile`).
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _editing = false;
+  bool _loading = true;
+  bool _saving = false;
+  String? _loadError;
 
   late _ProfileData _saved;
+  ProfileDetails? _serverProfile;
+  List<ProfileDocument> _documents = [];
+
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _locationController;
@@ -47,51 +63,185 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const _cardRadius = 12.0;
   static const _borderColor = Color(0xFFE0E0E0);
 
-  static final _documents = <({String title, String fileName})>[
-    (
-      title: 'Passport',
-      fileName: '20260508115126_1_6uHGpAX20afqczGiND7Uw.png',
-    ),
-    (
-      title: 'National insurance',
-      fileName: '20260508115259_1_fqT4_2fEeUul1rQ4Vg7oew.png',
-    ),
-    (
-      title: 'Qualification certificates',
-      fileName: '20260508115420_1_hK8xY3lQ2nNp0mR5sT6uV.png',
-    ),
-    (
-      title: 'Professional reference 1',
-      fileName: '20260508115501_1_ref1_doc.pdf',
-    ),
-    (
-      title: 'Professional reference 2',
-      fileName: '20260508115544_1_ref2_doc.pdf',
-    ),
-  ];
+  static const _emptyProfile = _ProfileData(
+    name: '',
+    email: '',
+    phone: '',
+    location: '',
+    qualifications: '',
+    experienceYears: '',
+    locumRole: 'Pharmacist',
+    travelKm: '',
+  );
 
   @override
   void initState() {
     super.initState();
-    _saved = const _ProfileData(
-      name: 'peter',
-      phone: '8978934780',
-      location: 'London, UK',
-      qualifications: 'PharmaB',
-      experienceYears: '5',
-      locumRole: 'Pharmacist',
-      travelKm: '10',
-    );
-    _nameController = TextEditingController(text: _saved.name);
-    _phoneController = TextEditingController(text: _saved.phone);
-    _locationController = TextEditingController(text: _saved.location);
-    _qualificationsController =
-        TextEditingController(text: _saved.qualifications);
-    _experienceController =
-        TextEditingController(text: _saved.experienceYears);
-    _travelKmController = TextEditingController(text: _saved.travelKm);
-    _locumRole = _saved.locumRole;
+    _saved = _emptyProfile;
+    _nameController = TextEditingController();
+    _phoneController = TextEditingController();
+    _locationController = TextEditingController();
+    _qualificationsController = TextEditingController();
+    _experienceController = TextEditingController();
+    _travelKmController = TextEditingController();
     _locationController.addListener(_onLocationFieldChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+  }
+
+  static String _displayLocumRole(String? apiRole) {
+    final r = apiRole?.trim().toLowerCase() ?? '';
+    if (r == 'technician') return 'Technician';
+    if (r == 'pharmacist') return 'Pharmacist';
+    if (r.isEmpty) return 'Pharmacist';
+    return r[0].toUpperCase() + r.substring(1);
+  }
+
+  static String _apiLocumRole(String display) {
+    switch (display) {
+      case 'Technician':
+        return 'technician';
+      default:
+        return 'pharmacist';
+    }
+  }
+
+  void _seedLocationFromProfile(ProfileDetails profile) {
+    final lat =
+        double.tryParse(profile.latitude ?? '') ?? profile.coordinates?.y;
+    final lng =
+        double.tryParse(profile.longitude ?? '') ?? profile.coordinates?.x;
+    if (lat == null || lng == null) return;
+    ref.read(registerLocationProvider.notifier).setPick(
+          PickedRegisterLocation(
+            latitude: lat,
+            longitude: lng,
+            placeId: '',
+            formattedAddress: profile.location,
+          ),
+        );
+  }
+
+  void _applyProfileDetails(ProfileDetails profile, {String? name, String? email}) {
+    _serverProfile = profile;
+    final displayName = name ?? _saved.name;
+    final displayEmail = email ?? _saved.email;
+    final role = _displayLocumRole(profile.locumRole);
+
+    _saved = _ProfileData(
+      name: displayName,
+      email: displayEmail,
+      phone: profile.phone.trim(),
+      location: profile.location.trim(),
+      qualifications: profile.qualifications.trim(),
+      experienceYears: '${profile.experienceYears}',
+      locumRole: role,
+      travelKm: '${profile.travelDistance}',
+    );
+
+    _nameController.text = displayName;
+    _phoneController.text = _saved.phone;
+    _locationController.text = _saved.location;
+    _qualificationsController.text = _saved.qualifications;
+    _experienceController.text = _saved.experienceYears;
+    _travelKmController.text = _saved.travelKm;
+    _locumRole = role;
+  }
+
+  void _applyPayload(ProfilePayload payload) {
+    final user = payload.user;
+    final profile = payload.profile;
+    _documents = List<ProfileDocument>.from(payload.documents);
+
+    if (profile != null) {
+      _applyProfileDetails(
+        profile,
+        name: user?.name.trim(),
+        email: user?.email.trim(),
+      );
+      ref.read(registerLocationProvider.notifier).clear();
+      _seedLocationFromProfile(profile);
+    } else {
+      _serverProfile = null;
+      _saved = _emptyProfile;
+    }
+  }
+
+  ProfileDetails? _buildUpdateBody() {
+    final base = _serverProfile;
+    if (base == null) return null;
+
+    final experience = int.tryParse(_experienceController.text.trim());
+    final travel = num.tryParse(_travelKmController.text.trim());
+    if (experience == null || travel == null) return null;
+
+    final location = _locationController.text.trim();
+    final picked = ref.read(registerLocationProvider);
+
+    var lat =
+        double.tryParse(base.latitude ?? '') ?? base.coordinates?.y ?? 0.0;
+    var lng =
+        double.tryParse(base.longitude ?? '') ?? base.coordinates?.x ?? 0.0;
+
+    if (picked != null &&
+        picked.formattedAddress.trim() == location.trim()) {
+      lat = picked.latitude;
+      lng = picked.longitude;
+    }
+
+    return ProfileDetails(
+      id: base.id,
+      userId: base.userId,
+      phone: _phoneController.text.trim(),
+      qualifications: _qualificationsController.text.trim(),
+      experienceYears: experience,
+      location: location,
+      latitude: lat.toString(),
+      longitude: lng.toString(),
+      travelDistance: travel,
+      locumRole: _apiLocumRole(_locumRole),
+      createdAt: base.createdAt,
+      updatedAt: base.updatedAt,
+      coordinates: ProfileCoordinates(x: lng, y: lat),
+    );
+  }
+
+  String? _validateEditLocation(String? v) {
+    final text = v?.trim() ?? '';
+    if (text.isEmpty) return 'Required';
+    if (AppEnv.googleMapsApiKey.isEmpty) return null;
+    final picked = ref.read(registerLocationProvider);
+    if (picked == null || picked.formattedAddress.trim() != text) {
+      return 'Choose a location from the suggestions';
+    }
+    return null;
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final payload =
+          await ref.read(profileRepositoryProvider).fetchProfile();
+      if (!mounted) return;
+      setState(() {
+        _applyPayload(payload);
+        _loading = false;
+      });
+    } on ProfileFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.toString();
+        _loading = false;
+      });
+    }
   }
 
   void _onLocationFieldChanged() {
@@ -110,36 +260,191 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  void _startEdit() => setState(() => _editing = true);
+  void _startEdit() {
+    final profile = _serverProfile;
+    if (profile != null) {
+      ref.read(registerLocationProvider.notifier).clear();
+      _seedLocationFromProfile(profile);
+    }
+    setState(() => _editing = true);
+  }
 
   void _cancelEdit() {
+    ref.read(registerLocationProvider.notifier).clear();
     _nameController.text = _saved.name;
     _phoneController.text = _saved.phone;
     _locationController.text = _saved.location;
     _qualificationsController.text = _saved.qualifications;
     _experienceController.text = _saved.experienceYears;
     _travelKmController.text = _saved.travelKm;
+    final profile = _serverProfile;
+    if (profile != null) {
+      _seedLocationFromProfile(profile);
+    }
     setState(() {
       _locumRole = _saved.locumRole;
       _editing = false;
     });
   }
 
-  void _saveEdit() {
-    setState(() {
-      _saved = _ProfileData(
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        location: _locationController.text.trim(),
-        qualifications: _qualificationsController.text.trim(),
-        experienceYears: _experienceController.text.trim(),
-        locumRole: _locumRole,
-        travelKm: _travelKmController.text.trim(),
+  Future<void> _saveEdit() async {
+    if (_saving || _serverProfile == null) return;
+
+    if (_phoneController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phone is required.')),
       );
-      _editing = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile saved (demo).')),
+      return;
+    }
+    if (_qualificationsController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Qualifications are required.')),
+      );
+      return;
+    }
+
+    final body = _buildUpdateBody();
+    if (body == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Check experience years and travel distance.'),
+        ),
+      );
+      return;
+    }
+
+    if (AppEnv.googleMapsApiKey.isNotEmpty) {
+      final locErr = _validateEditLocation(_locationController.text);
+      if (locErr != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(locErr)),
+        );
+        return;
+      }
+    } else if (_locationController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Location is required.')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final result =
+          await ref.read(profileRepositoryProvider).updateProfile(body);
+      if (!mounted) return;
+      final updated = result.data!;
+      _applyProfileDetails(updated);
+      ref.read(registerLocationProvider.notifier).clear();
+      _seedLocationFromProfile(updated);
+      setState(() => _editing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.message?.trim().isNotEmpty == true
+                ? result.message!.trim()
+                : 'Profile updated successfully',
+          ),
+        ),
+      );
+    } on ProfileFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  static bool _isPreviewableImage(String fileName) {
+    final lower = fileName.toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.bmp');
+  }
+
+  void _previewDocument(ProfileDocument doc) {
+    final url = ApiConstants.documentUrl(doc.documentName);
+    if (!_isPreviewableImage(doc.documentName)) {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(doc.displayTitle),
+          content: SelectableText(
+            'Preview is not available for this file type.\n\n$url',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      doc.displayTitle,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: InteractiveViewer(
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return const Padding(
+                      padding: EdgeInsets.all(48),
+                      child: CircularProgressIndicator(),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Could not load image.\n$url',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
     );
   }
 
@@ -152,9 +457,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: [
+          if (!_loading && _loadError == null)
+            IconButton(
+              onPressed: _loadProfile,
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+            ),
+        ],
       ),
-      body: ListView(
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_loadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.grey.shade600),
+              const SizedBox(height: 16),
+              Text(
+                _loadError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade800, fontSize: 15),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _loadProfile,
+                child: const Text('Try again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadProfile,
+      child: ListView(
         padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
           _userHeaderCard(context),
           const SizedBox(height: 16),
@@ -192,16 +541,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: _editing
                 ? [
                     IconButton.filled(
-                      onPressed: _saveEdit,
+                      onPressed: _saving ? null : _saveEdit,
                       style: IconButton.styleFrom(
                         backgroundColor: BrandColors.locumsGreen,
                         foregroundColor: Colors.white,
                       ),
-                      icon: const Icon(Icons.check_rounded, size: 22),
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.check_rounded, size: 22),
                       tooltip: 'Save',
                     ),
                     IconButton(
-                      onPressed: _cancelEdit,
+                      onPressed: _saving ? null : _cancelEdit,
                       icon: Icon(
                         Icons.close_rounded,
                         color: Colors.grey.shade800,
@@ -211,7 +569,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ]
                 : [
                     IconButton(
-                      onPressed: _startEdit,
+                      onPressed: _saving ? null : _startEdit,
                       icon: Icon(
                         Icons.edit_outlined,
                         color: BrandColors.locumsGreen,
@@ -250,36 +608,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          if (_editing)
-            TextField(
-              controller: _nameController,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'Display name',
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-              ),
-            )
-          else
-            Text(
-              _saved.name,
+          Text(
+              _saved.name.isEmpty ? '—' : _saved.name,
               textAlign: TextAlign.center,
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.3,
               ),
             ),
+          if (_saved.email.isNotEmpty && !_editing) ...[
+            const SizedBox(height: 6),
+            Text(
+              _saved.email,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+            ),
+          ],
           const SizedBox(height: 16),
           _headerContactRow(
             icon: Icons.phone_outlined,
@@ -303,7 +647,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   )
                 : Text(
-                    _saved.phone,
+                    _saved.phone.isEmpty ? '—' : _saved.phone,
                     style: TextStyle(
                       fontSize: 15,
                       color: Colors.grey.shade800,
@@ -318,7 +662,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? (_locationController.text.isEmpty
                       ? 'Edit location below'
                       : _locationController.text)
-                  : _saved.location,
+                  : (_saved.location.isEmpty ? '—' : _saved.location),
               style: TextStyle(
                 fontSize: 15,
                 color: Colors.grey.shade800,
@@ -391,7 +735,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 )
               : Text(
-                  _saved.qualifications,
+                  _saved.qualifications.isEmpty ? '—' : _saved.qualifications,
                   style: const TextStyle(fontSize: 15),
                 ),
           const SizedBox(height: 16),
@@ -417,8 +761,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 )
-              : Text(_saved.experienceYears,
-                  style: const TextStyle(fontSize: 15)),
+              : Text(
+                  _saved.experienceYears.isEmpty ? '—' : _saved.experienceYears,
+                  style: const TextStyle(fontSize: 15),
+                ),
           const SizedBox(height: 16),
           Text(
             'LOCUM ROLE',
@@ -440,7 +786,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      value: _locumRole,
+                      value: _roleOptions.contains(_locumRole)
+                          ? _locumRole
+                          : _roleOptions.first,
                       isExpanded: true,
                       items: _roleOptions
                           .map(
@@ -452,7 +800,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 )
-              : Text(_saved.locumRole, style: const TextStyle(fontSize: 15)),
+              : Text(
+                  _saved.locumRole.isEmpty ? '—' : _saved.locumRole,
+                  style: const TextStyle(fontSize: 15),
+                ),
         ],
       ),
     );
@@ -475,22 +826,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 6),
           _editing
-              ? TextField(
+              ? RegisterLocationAutocomplete(
                   controller: _locationController,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     hintText: 'Search by address / area',
+                    filled: true,
+                    fillColor: Colors.white,
                   ),
-                  onChanged: (_) => setState(() {}),
+                  validator: _validateEditLocation,
                 )
-              : Text(_saved.location, style: const TextStyle(fontSize: 15)),
-          const SizedBox(height: 4),
-          Text(
-            'Start typing to search for locations',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
+              : Text(
+                  _saved.location.isEmpty ? '—' : _saved.location,
+                  style: const TextStyle(fontSize: 15),
+                ),
+          if (_editing) ...[
+            const SizedBox(height: 4),
+            Text(
+              AppEnv.googleMapsApiKey.isEmpty
+                  ? 'Enter location manually or add GOOGLE_MAPS_API_KEY to .env.'
+                  : 'Start typing to search — tap a suggestion to update coordinates.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
           const SizedBox(height: 16),
           Text(
             'TRAVEL DISTANCE (KM)',
@@ -514,50 +874,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 )
-              : Text(_saved.travelKm, style: const TextStyle(fontSize: 15)),
+              : Text(
+                  _saved.travelKm.isEmpty ? '—' : _saved.travelKm,
+                  style: const TextStyle(fontSize: 15),
+                ),
         ],
       ),
     );
   }
 
   Widget _documentsCard(BuildContext context) {
+    final count = _documents.length;
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle(Icons.description_outlined, 'Documents (5)'),
+          _sectionTitle(
+            Icons.description_outlined,
+            'Documents ($count)',
+          ),
           const SizedBox(height: 4),
           Text(
             'Tap a row to preview',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 12),
-          ...List<Widget>.generate(_documents.length, (i) {
-            final d = _documents[i];
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _documentRow(context, d),
-                if (i < _documents.length - 1)
-                  Divider(height: 1, color: Colors.grey.shade200),
-              ],
-            );
-          }),
+          if (_documents.isEmpty)
+            Text(
+              'No documents on file.',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            )
+          else
+            ...List<Widget>.generate(_documents.length, (i) {
+              final d = _documents[i];
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _documentRow(context, d),
+                  if (i < _documents.length - 1)
+                    Divider(height: 1, color: Colors.grey.shade200),
+                ],
+              );
+            }),
         ],
       ),
     );
   }
 
-  Widget _documentRow(
-    BuildContext context,
-    ({String title, String fileName}) doc,
-  ) {
+  Widget _documentRow(BuildContext context, ProfileDocument doc) {
     return InkWell(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('View: ${doc.title}')),
-        );
-      },
+      onTap: () => _previewDocument(doc),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
@@ -573,12 +939,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(width: 12),
+            if (_isPreviewableImage(doc.documentName)) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.network(
+                  ApiConstants.documentUrl(doc.documentName),
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 44,
+                    height: 44,
+                    color: Colors.grey.shade200,
+                    child: Icon(Icons.broken_image_outlined,
+                        color: Colors.grey.shade500),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    doc.title,
+                    doc.displayTitle,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -587,7 +972,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    doc.fileName,
+                    doc.documentName,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -600,11 +985,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             IconButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('View: ${doc.title}')),
-                );
-              },
+              onPressed: () => _previewDocument(doc),
               icon: Icon(
                 Icons.visibility_outlined,
                 color: BrandColors.locumsGreen,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'auth/auth_providers.dart';
 import 'auth/auth_repository.dart';
+import 'auth/auth_session.dart';
 import 'brand_colors.dart';
 import 'router/app_router.dart';
 
@@ -135,6 +136,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) {
         return;
       }
+      ref.read(authSessionProvider.notifier).markAuthenticated();
       context.go(AppRoute.dashboard);
     } on AuthFailure catch (e) {
       if (!mounted) {
