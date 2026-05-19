@@ -7,10 +7,12 @@ import '../book/book_now_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../forgot_password_screen.dart';
 import '../login_screen.dart';
+import '../bookings/my_bookings_screen.dart';
 import '../profile/profile_screen.dart';
 import '../register/register_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shell/main_shell_screen.dart';
+import '../shifts/shift_detail_screen.dart';
 import '../splash_screen.dart';
 
 /// Path segments for [GoRouter]; use with [context.go] / [context.push].
@@ -28,6 +30,15 @@ abstract final class AppRoute {
   static const settings = '/settings';
 
   static const profile = '/profile';
+
+  static const myBookings = '/my-bookings';
+
+  static const shiftDetail = '/shifts/:shiftId';
+
+  static String shiftDetailPath(int shiftId, {bool isBooked = false}) {
+    final booked = isBooked ? '1' : '0';
+    return '/shifts/$shiftId?is_booked=$booked';
+  }
 }
 
 final GlobalKey<NavigatorState> rootNavigatorKey =
@@ -150,6 +161,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
           return const ProfileScreen();
+        },
+      ),
+      GoRoute(
+        path: AppRoute.myBookings,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          return const MyBookingsScreen();
+        },
+      ),
+      GoRoute(
+        path: AppRoute.shiftDetail,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          final id = int.tryParse(state.pathParameters['shiftId'] ?? '');
+          if (id == null) {
+            return const Scaffold(
+              body: Center(child: Text('Invalid shift')),
+            );
+          }
+          final isBooked = state.uri.queryParameters['is_booked'] == '1';
+          return ShiftDetailScreen(
+            shiftId: id,
+            initialIsBooked: isBooked,
+          );
         },
       ),
     ],

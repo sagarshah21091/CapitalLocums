@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/models/booking_models.dart';
+import '../bookings/booking_list_card.dart';
 import 'bookings_repository.dart';
+import 'cancel_booking_flow.dart';
 import 'dashboard_providers.dart';
 
 /// Locum workspace dashboard — GET `/bookings/my`.
@@ -85,6 +87,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int get _confirmedCount => _bookings.where((b) => b.isConfirmed).length;
   int get _completedCount => _bookings.where((b) => b.isCompleted).length;
   int get _cancelledCount => _bookings.where((b) => b.isCancelled).length;
+
+  Future<void> _onCancelBooking(LocumBooking booking) async {
+    final details =
+        '${booking.formattedDate}\n${booking.formattedTimeRange}\n${booking.location}';
+    final cancelled = await confirmAndCancelBooking(
+      context,
+      ref,
+      bookingId: booking.bookingId,
+      details: details,
+    );
+    if (cancelled && mounted) {
+      await _load();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +285,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             )
           : _bookingCardColumn(
               items: upcoming,
-              variant: _BookingVariant.confirmed,
+              variant: BookingCardVariant.confirmed,
+              onCancel: _onCancelBooking,
             ),
     );
   }
@@ -290,26 +307,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           : _bookingCardColumn(
               items: history,
               variantFor: (b) => b.isCancelled
-                  ? _BookingVariant.cancelled
-                  : _BookingVariant.completed,
+                  ? BookingCardVariant.cancelled
+                  : BookingCardVariant.completed,
             ),
     );
   }
 
   Widget _bookingCardColumn({
     required List<LocumBooking> items,
-    _BookingVariant? variant,
-    _BookingVariant Function(LocumBooking)? variantFor,
+    BookingCardVariant? variant,
+    BookingCardVariant Function(LocumBooking)? variantFor,
+    void Function(LocumBooking)? onCancel,
   }) {
     return Column(
       children: [
         for (var i = 0; i < items.length; i++) ...[
           if (i > 0) const SizedBox(height: 12),
-          _BookingCard(
+          BookingListCard(
             booking: items[i],
             variant: variant ??
                 variantFor?.call(items[i]) ??
-                _BookingVariant.confirmed,
+                BookingCardVariant.confirmed,
+            onCancel: onCancel != null && items[i].isConfirmed
+                ? () => onCancel(items[i])
+                : null,
           ),
         ],
       ],
@@ -454,188 +475,6 @@ class _Panel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           child,
-        ],
-      ),
-    );
-  }
-}
-
-enum _BookingVariant { confirmed, completed, cancelled }
-
-class _BookingCard extends StatelessWidget {
-  const _BookingCard({required this.booking, required this.variant});
-
-  final LocumBooking booking;
-  final _BookingVariant variant;
-
-  Color get _accent {
-    switch (variant) {
-      case _BookingVariant.confirmed:
-        return _DashboardScreenState._confirmedGreen;
-      case _BookingVariant.completed:
-        return _DashboardScreenState._completedBlue;
-      case _BookingVariant.cancelled:
-        return _DashboardScreenState._cancelledRed;
-    }
-  }
-
-  String get _statusLabel {
-    switch (variant) {
-      case _BookingVariant.confirmed:
-        return 'CONFIRMED';
-      case _BookingVariant.completed:
-        return 'COMPLETED';
-      case _BookingVariant.cancelled:
-        return 'CANCELLED';
-    }
-  }
-
-  String get _footerLabel {
-    switch (variant) {
-      case _BookingVariant.confirmed:
-        return 'Upcoming shift';
-      case _BookingVariant.completed:
-        return 'Shift Completed';
-      case _BookingVariant.cancelled:
-        return 'Cancelled';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _DashboardScreenState._cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      booking.formattedDate,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: _DashboardScreenState._titleNavy,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      booking.locumRole,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _StatusBadge(label: _statusLabel, color: _accent),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.schedule, size: 18, color: Colors.grey.shade600),
-              const SizedBox(width: 6),
-              Text(
-                booking.formattedTimeRange,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-              ),
-              const Spacer(),
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.location_on_outlined,
-                        size: 18, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        booking.location,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade800,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                booking.formattedPayRate,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: _accent,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                _footerLabel,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            label == 'CANCELLED' ? Icons.close : Icons.check,
-            size: 14,
-            color: Colors.white,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: 0.3,
-            ),
-          ),
         ],
       ),
     );

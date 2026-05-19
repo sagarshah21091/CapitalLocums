@@ -16,6 +16,7 @@ class RegisterLocationAutocomplete extends ConsumerStatefulWidget {
     this.validator,
     this.textInputAction,
     this.components,
+    this.locationProvider,
   });
 
   final TextEditingController controller;
@@ -25,6 +26,13 @@ class RegisterLocationAutocomplete extends ConsumerStatefulWidget {
 
   /// e.g. `country:gb` — pass empty string to disable biasing.
   final String? components;
+
+  /// Defaults to [registerLocationProvider] (registration / profile).
+  final NotifierProvider<RegisterLocation, PickedRegisterLocation?>?
+      locationProvider;
+
+  NotifierProvider<RegisterLocation, PickedRegisterLocation?>
+      get _locationProvider => locationProvider ?? registerLocationProvider;
 
   @override
   ConsumerState<RegisterLocationAutocomplete> createState() =>
@@ -60,10 +68,10 @@ class _RegisterLocationAutocompleteState
   }
 
   void _onTypedAddressChanged() {
-    final picked = ref.read(registerLocationProvider);
+    final picked = ref.read(widget._locationProvider);
     final text = widget.controller.text;
     if (picked != null && picked.formattedAddress.trim() != text.trim()) {
-      ref.read(registerLocationProvider.notifier).clear();
+      ref.read(widget._locationProvider.notifier).clear();
     }
     _scheduleFetch(text);
   }
@@ -152,7 +160,7 @@ class _RegisterLocationAutocompleteState
         offset: widget.controller.text.length,
       );
 
-      ref.read(registerLocationProvider.notifier).setPick(
+      ref.read(widget._locationProvider.notifier).setPick(
             PickedRegisterLocation(
               latitude: details.latitude,
               longitude: details.longitude,

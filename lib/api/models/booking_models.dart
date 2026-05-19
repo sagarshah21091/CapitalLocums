@@ -1,3 +1,20 @@
+class BookShiftResponse {
+  const BookShiftResponse({
+    required this.success,
+    this.message,
+  });
+
+  final bool success;
+  final String? message;
+
+  factory BookShiftResponse.fromJson(Map<String, dynamic> json) {
+    return BookShiftResponse(
+      success: json['success'] as bool? ?? false,
+      message: json['message'] as String?,
+    );
+  }
+}
+
 class MyBookingsResponse {
   const MyBookingsResponse({
     required this.success,
@@ -105,4 +122,13 @@ class LocumBooking {
   bool get isConfirmed => status == 'confirmed';
   bool get isCompleted => status == 'completed';
   bool get isCancelled => status == 'cancelled';
+
+  String get displayRole {
+    final r = locumRole.trim().toLowerCase();
+    if (r.isEmpty) return '—';
+    if (r == 'pharmacist') return 'Pharmacist';
+    if (r == 'dispenser') return 'Dispenser';
+    if (r == 'technician') return 'Technician';
+    return r[0].toUpperCase() + r.substring(1);
+  }
 }

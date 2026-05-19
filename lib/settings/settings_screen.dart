@@ -76,6 +76,14 @@ class SettingsScreen extends ConsumerWidget {
         ),
         const Divider(height: 1),
         ListTile(
+          leading: const Icon(Icons.calendar_month_outlined),
+          title: const Text('My bookings'),
+          subtitle: const Text('View all your shift bookings'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push(AppRoute.myBookings),
+        ),
+        const Divider(height: 1),
+        ListTile(
           leading: const Icon(Icons.logout),
           title: const Text('Logout'),
           onTap: () => _logout(context, ref),

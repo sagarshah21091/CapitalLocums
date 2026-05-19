@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../shifts/shifts_providers.dart';
 import 'shell_user_header_provider.dart';
 
 /// Hosts [StatefulNavigationShell]: AppBar, tab body, bottom [NavigationBar].
@@ -20,7 +21,7 @@ class MainShellScreen extends ConsumerWidget {
     final headerAsync = ref.watch(shellUserHeaderProvider);
 
     return Scaffold(
-      backgroundColor: index == 0 ? _shellBg : null,
+      backgroundColor: index == 0 || index == 1 ? _shellBg : null,
       appBar: AppBar(
         toolbarHeight: 64,
         title: headerAsync.when(
@@ -43,10 +44,18 @@ class MainShellScreen extends ConsumerWidget {
           ),
         ),
         centerTitle: false,
-        backgroundColor: index == 0 ? _shellBg : null,
+        backgroundColor: index == 0 || index == 1 ? _shellBg : null,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         actions: [
+          if (index == 1)
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              tooltip: 'Filter shifts',
+              onPressed: () {
+                ref.read(shiftsFilterOpenTriggerProvider.notifier).open();
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             tooltip: 'Notifications',
