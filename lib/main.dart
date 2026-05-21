@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_version.dart';
 import 'brand_colors.dart';
 import 'env/app_env.dart';
 import 'router/app_router.dart';
@@ -10,6 +11,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await AppEnv.load();
+  await initAppVersion();
 
   // Opens the SharedPreferences platform channel before first login save.
   // Avoids pigeon channel errors when plugins initialize too late on some targets.

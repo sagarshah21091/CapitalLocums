@@ -35,6 +35,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _qualificationsController = TextEditingController();
   final _experienceController = TextEditingController();
   final _travelKmController = TextEditingController();
+  final _gphcController = TextEditingController();
+  final _proRef1NameController = TextEditingController();
+  final _proRef1PhoneController = TextEditingController();
+  final _proRef1DetailsController = TextEditingController();
+  final _proRef2NameController = TextEditingController();
+  final _proRef2PhoneController = TextEditingController();
+  final _proRef2DetailsController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _submitting = false;
@@ -54,16 +61,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   static const _border = Color(0xFFE0E0E0);
   static const _labelColor = Color(0xFF424242);
 
-  static const _yourRoleOptions = ['Pharmacist', 'Technician'];
+  static const _yourRoleOptions = ['Pharmacist', 'Technician', 'Dispenser'];
 
   static final _docSlots = <({String label, bool isRequired})>[
     (label: 'Passport', isRequired: true),
     (label: 'Visa/Work permit (if required)', isRequired: false),
     (label: 'National insurance', isRequired: true),
     (label: 'Qualification certificates', isRequired: true),
-    (label: 'Professional reference 1', isRequired: true),
-    (label: 'Professional reference 2', isRequired: true),
   ];
+
+  static final _passwordSpecialCharPattern =
+      RegExp(r'''[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/`~;']''');
+
+  static List<String> _passwordRequirementGaps(String password) {
+    final gaps = <String>[];
+    if (password.length < 8) gaps.add('8+ characters');
+    if (!RegExp(r'[A-Z]').hasMatch(password)) gaps.add('1 uppercase');
+    if (!RegExp(r'[a-z]').hasMatch(password)) gaps.add('1 lowercase');
+    if (!RegExp(r'[0-9]').hasMatch(password)) gaps.add('1 number');
+    if (!_passwordSpecialCharPattern.hasMatch(password)) {
+      gaps.add('1 special character');
+    }
+    return gaps;
+  }
+
+  String? _validatePassword(String? value) {
+    final password = value ?? '';
+    if (password.isEmpty) return 'Required';
+    final gaps = _passwordRequirementGaps(password);
+    if (gaps.isEmpty) return null;
+    return 'Needs: ${gaps.join(', ')}';
+  }
 
   String? _validateLocation(String? v) {
     final text = v?.trim() ?? '';
@@ -88,6 +116,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _qualificationsController.dispose();
     _experienceController.dispose();
     _travelKmController.dispose();
+    _gphcController.dispose();
+    _proRef1NameController.dispose();
+    _proRef1PhoneController.dispose();
+    _proRef1DetailsController.dispose();
+    _proRef2NameController.dispose();
+    _proRef2PhoneController.dispose();
+    _proRef2DetailsController.dispose();
     super.dispose();
   }
 
@@ -114,7 +149,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  Widget _requiredLabel(String text, {required bool isRequired}) {
+  Widget _requiredLabel(
+    String text, {
+    required bool isRequired,
+    bool uppercase = true,
+  }) {
+    final labelText = uppercase ? text.toUpperCase() : text;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: RichText(
@@ -126,7 +166,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             letterSpacing: 0.4,
           ),
           children: [
-            TextSpan(text: text.toUpperCase()),
+            TextSpan(text: labelText),
             if (isRequired)
               const TextSpan(
                 text: ' *',
@@ -177,6 +217,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     switch (_yourRole) {
       case 'Technician':
         return 'technician';
+      case 'Dispenser':
+        return 'dispenser';
       default:
         return 'pharmacist';
     }
@@ -288,11 +330,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             experienceYears: experience,
             locumRole: _locumRoleForApi(),
             travelDistanceKm: travelKm,
+            gphcNumber: _gphcController.text.trim(),
             passport: docs[RegisterDocSlot.passport]!,
             nationalInsurance: docs[RegisterDocSlot.nationalInsurance]!,
             qualificationCert: docs[RegisterDocSlot.qualificationCert]!,
-            professionalReference1: docs[RegisterDocSlot.professionalReference1]!,
-            professionalReference2: docs[RegisterDocSlot.professionalReference2]!,
+            professionalReference1Name: _proRef1NameController.text,
+            professionalReference1Phone: _proRef1PhoneController.text,
+            professionalReference1Details: _proRef1DetailsController.text,
+            professionalReference2Name: _proRef2NameController.text,
+            professionalReference2Phone: _proRef2PhoneController.text,
+            professionalReference2Details: _proRef2DetailsController.text,
             visaWorkPermit: docs[RegisterDocSlot.visaWorkPermit],
           );
 
@@ -388,55 +435,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _twoCol(
-                    wide: wide,
-                    left: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Password', isRequired: true),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          decoration: _decoration('Strong password').copyWith(
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                                size: 20,
-                              ),
-                              onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword,
-                              ),
-                            ),
-                          ),
-                          validator: (v) =>
-                              v == null || v.length < 8 ? 'Min 8 characters' : null,
-                          textInputAction: TextInputAction.next,
+                  _requiredLabel('Password', isRequired: true),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    decoration: _decoration('Strong password').copyWith(
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 20,
                         ),
-                      ],
-                    ),
-                    right: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Role', isRequired: true),
-                        InputDecorator(
-                          decoration:
-                              _decoration('').copyWith(hintText: null),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            child: Text(
-                              'Locum',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey.shade900,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
                         ),
-                      ],
+                      ),
                     ),
+                    validator: _validatePassword,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
                   _requiredLabel('Location', isRequired: true),
@@ -552,7 +570,45 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                       ],
                     ),
-                    right: const SizedBox.shrink(),
+                    right: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _requiredLabel(
+                          'GPhC number (7 digits)',
+                          isRequired: true,
+                          uppercase: false,
+                        ),
+                        TextFormField(
+                          controller: _gphcController,
+                          decoration: _decoration('1234567'),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(7),
+                          ],
+                          validator: (v) {
+                            final t = v?.trim() ?? '';
+                            if (t.isEmpty) return 'Required';
+                            if (t.length != 7) {
+                              return 'Enter exactly 7 digits';
+                            }
+                            return null;
+                          },
+                          textInputAction: TextInputAction.next,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  _ProfessionalReferencesSection(
+                    requiredLabel: _requiredLabel,
+                    decoration: _decoration,
+                    proRef1Name: _proRef1NameController,
+                    proRef1Phone: _proRef1PhoneController,
+                    proRef1Details: _proRef1DetailsController,
+                    proRef2Name: _proRef2NameController,
+                    proRef2Phone: _proRef2PhoneController,
+                    proRef2Details: _proRef2DetailsController,
                   ),
                   const SizedBox(height: 28),
                   _DocumentsCard(
@@ -658,6 +714,121 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         const SizedBox(height: 16),
         right,
       ],
+    );
+  }
+}
+
+class _ProfessionalReferencesSection extends StatelessWidget {
+  const _ProfessionalReferencesSection({
+    required this.requiredLabel,
+    required this.decoration,
+    required this.proRef1Name,
+    required this.proRef1Phone,
+    required this.proRef1Details,
+    required this.proRef2Name,
+    required this.proRef2Phone,
+    required this.proRef2Details,
+  });
+
+  final Widget Function(String text, {required bool isRequired}) requiredLabel;
+  final InputDecoration Function(String hint) decoration;
+  final TextEditingController proRef1Name;
+  final TextEditingController proRef1Phone;
+  final TextEditingController proRef1Details;
+  final TextEditingController proRef2Name;
+  final TextEditingController proRef2Phone;
+  final TextEditingController proRef2Details;
+
+  static const _detailsHint =
+      'Please give details of the company and relationships.';
+
+  Widget _referenceBlock({
+    required String title,
+    required TextEditingController name,
+    required TextEditingController phone,
+    required TextEditingController details,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF424242),
+          ),
+        ),
+        const SizedBox(height: 12),
+        requiredLabel('Name', isRequired: true),
+        TextFormField(
+          controller: name,
+          decoration: decoration(''),
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? 'Required' : null,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 12),
+        requiredLabel('Phone number', isRequired: true),
+        TextFormField(
+          controller: phone,
+          decoration: decoration('Enter phone number'),
+          keyboardType: TextInputType.phone,
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? 'Required' : null,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 12),
+        requiredLabel('Details', isRequired: true),
+        TextFormField(
+          controller: details,
+          decoration: decoration(_detailsHint),
+          maxLines: 3,
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? 'Required' : null,
+          textInputAction: TextInputAction.next,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Professional references',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF424242),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _referenceBlock(
+            title: 'Professional Reference 1',
+            name: proRef1Name,
+            phone: proRef1Phone,
+            details: proRef1Details,
+          ),
+          const SizedBox(height: 24),
+          _referenceBlock(
+            title: 'Professional Reference 2',
+            name: proRef2Name,
+            phone: proRef2Phone,
+            details: proRef2Details,
+          ),
+        ],
+      ),
     );
   }
 }

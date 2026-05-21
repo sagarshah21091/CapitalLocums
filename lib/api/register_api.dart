@@ -26,11 +26,16 @@ class RegisterApi {
     required int experienceYears,
     required String locumRole,
     required double travelDistanceKm,
+    required String gphcNumber,
     required XFile passport,
     required XFile nationalInsurance,
     required XFile qualificationCert,
-    required XFile professionalReference1,
-    required XFile professionalReference2,
+    required String professionalReference1Name,
+    required String professionalReference1Phone,
+    required String professionalReference1Details,
+    required String professionalReference2Name,
+    required String professionalReference2Phone,
+    required String professionalReference2Details,
     XFile? visaWorkPermit,
   }) async {
     final formData = FormData();
@@ -51,6 +56,19 @@ class RegisterApi {
     addField('experience_years', '$experienceYears');
     addField('locum_role', locumRole.trim().toLowerCase());
     addField('travel_distance', '$travelDistanceKm');
+    addField('gphc_number', gphcNumber.trim());
+    addField('ref_Name_1', professionalReference1Name.trim());
+    addField('ref_PhoneNumber_1', professionalReference1Phone.trim());
+    addField(
+      'ref_Details_1',
+      professionalReference1Details.trim(),
+    );
+    addField('ref_Name_2', professionalReference2Name.trim());
+    addField('ref_PhoneNumber_2', professionalReference2Phone.trim());
+    addField(
+      'ref_Details_2',
+      professionalReference2Details.trim(),
+    );
 
     Future<void> addFile(String field, XFile file) async {
       final prepared = await prepareRegisterAttachmentForUpload(file);
@@ -64,8 +82,6 @@ class RegisterApi {
       }
       await addFile('national_insurance', nationalInsurance);
       await addFile('qualification_certificates', qualificationCert);
-      await addFile('professional_reference_1', professionalReference1);
-      await addFile('professional_reference_2', professionalReference2);
 
       final response = await _dio.post<Map<String, dynamic>>(
         '/auth/register',

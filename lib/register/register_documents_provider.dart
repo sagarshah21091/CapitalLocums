@@ -1,7 +1,7 @@
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Document slots on the registration form (indexed 0..5).
+/// Document slots on the registration form (indexed 0..3).
 abstract final class RegisterDocSlot {
   RegisterDocSlot._();
 
@@ -9,10 +9,8 @@ abstract final class RegisterDocSlot {
   static const visaWorkPermit = 1;
   static const nationalInsurance = 2;
   static const qualificationCert = 3;
-  static const professionalReference1 = 4;
-  static const professionalReference2 = 5;
 
-  static const count = 6;
+  static const count = 4;
 }
 
 /// Files chosen for locum uploads (multipart).

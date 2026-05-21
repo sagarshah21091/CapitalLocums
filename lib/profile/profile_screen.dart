@@ -22,6 +22,13 @@ class _ProfileData {
     required this.experienceYears,
     required this.locumRole,
     required this.travelKm,
+    required this.gphcNumber,
+    required this.refName1,
+    required this.refPhone1,
+    required this.refDetails1,
+    required this.refName2,
+    required this.refPhone2,
+    required this.refDetails2,
   });
 
   final String name;
@@ -32,6 +39,13 @@ class _ProfileData {
   final String experienceYears;
   final String locumRole;
   final String travelKm;
+  final String gphcNumber;
+  final String refName1;
+  final String refPhone1;
+  final String refDetails1;
+  final String refName2;
+  final String refPhone2;
+  final String refDetails2;
 }
 
 /// Locum profile: header, professional, service area, documents (GET `/profile`).
@@ -58,9 +72,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late final TextEditingController _qualificationsController;
   late final TextEditingController _experienceController;
   late final TextEditingController _travelKmController;
+  late final TextEditingController _gphcController;
   String _locumRole = 'Pharmacist';
 
-  static const _roleOptions = ['Pharmacist', 'Technician'];
+  static const _roleOptions = ['Pharmacist', 'Technician', 'Dispenser'];
   static const _cardRadius = 12.0;
   static const _borderColor = Color(0xFFE0E0E0);
 
@@ -73,6 +88,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     experienceYears: '',
     locumRole: 'Pharmacist',
     travelKm: '',
+    gphcNumber: '',
+    refName1: '',
+    refPhone1: '',
+    refDetails1: '',
+    refName2: '',
+    refPhone2: '',
+    refDetails2: '',
   );
 
   @override
@@ -85,6 +107,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _qualificationsController = TextEditingController();
     _experienceController = TextEditingController();
     _travelKmController = TextEditingController();
+    _gphcController = TextEditingController();
     _locationController.addListener(_onLocationFieldChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
   }
@@ -93,6 +116,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final r = apiRole?.trim().toLowerCase() ?? '';
     if (r == 'technician') return 'Technician';
     if (r == 'pharmacist') return 'Pharmacist';
+    if (r == 'dispenser') return 'Dispenser';
     if (r.isEmpty) return 'Pharmacist';
     return r[0].toUpperCase() + r.substring(1);
   }
@@ -101,6 +125,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     switch (display) {
       case 'Technician':
         return 'technician';
+      case 'Dispenser':
+        return 'dispenser';
       default:
         return 'pharmacist';
     }
@@ -122,7 +148,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
   }
 
-  void _applyProfileDetails(ProfileDetails profile, {String? name, String? email}) {
+  void _applyProfileDetails(
+    ProfileDetails profile, {
+    String? name,
+    String? email,
+    ProfileUser? user,
+  }) {
     _serverProfile = profile;
     final displayName = name ?? _saved.name;
     final displayEmail = email ?? _saved.email;
@@ -137,6 +168,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       experienceYears: '${profile.experienceYears}',
       locumRole: role,
       travelKm: '${profile.travelDistance}',
+      gphcNumber: profile.gphcNumber.trim(),
+      refName1: user?.refName1.trim() ?? _saved.refName1,
+      refPhone1: user?.refPhoneNumber1.trim() ?? _saved.refPhone1,
+      refDetails1: user?.refDetails1.trim() ?? _saved.refDetails1,
+      refName2: user?.refName2.trim() ?? _saved.refName2,
+      refPhone2: user?.refPhoneNumber2.trim() ?? _saved.refPhone2,
+      refDetails2: user?.refDetails2.trim() ?? _saved.refDetails2,
     );
 
     _nameController.text = displayName;
@@ -145,6 +183,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _qualificationsController.text = _saved.qualifications;
     _experienceController.text = _saved.experienceYears;
     _travelKmController.text = _saved.travelKm;
+    _gphcController.text = _saved.gphcNumber;
     _locumRole = role;
   }
 
@@ -158,6 +197,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         profile,
         name: user?.name.trim(),
         email: user?.email.trim(),
+        user: user,
       );
       ref.read(registerLocationProvider.notifier).clear();
       _seedLocationFromProfile(profile);
@@ -200,6 +240,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       longitude: lng.toString(),
       travelDistance: travel,
       locumRole: _apiLocumRole(_locumRole),
+      gphcNumber: _gphcController.text.trim(),
       createdAt: base.createdAt,
       updatedAt: base.updatedAt,
       coordinates: ProfileCoordinates(x: lng, y: lat),
@@ -258,6 +299,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _qualificationsController.dispose();
     _experienceController.dispose();
     _travelKmController.dispose();
+    _gphcController.dispose();
     super.dispose();
   }
 
@@ -278,6 +320,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _qualificationsController.text = _saved.qualifications;
     _experienceController.text = _saved.experienceYears;
     _travelKmController.text = _saved.travelKm;
+    _gphcController.text = _saved.gphcNumber;
     final profile = _serverProfile;
     if (profile != null) {
       _seedLocationFromProfile(profile);
@@ -300,6 +343,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (_qualificationsController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Qualifications are required.')),
+      );
+      return;
+    }
+
+    final gphc = _gphcController.text.trim();
+    if (gphc.isEmpty || gphc.length != 7 || !RegExp(r'^\d{7}$').hasMatch(gphc)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('GPhC number must be exactly 7 digits.')),
       );
       return;
     }
@@ -335,7 +386,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           await ref.read(profileRepositoryProvider).updateProfile(body);
       if (!mounted) return;
       final updated = result.data!;
-      _applyProfileDetails(updated);
+      _applyProfileDetails(
+        updated,
+        name: _saved.name,
+        email: _saved.email,
+      );
       ref.read(registerLocationProvider.notifier).clear();
       _seedLocationFromProfile(updated);
       setState(() => _editing = false);
@@ -530,6 +585,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _userHeaderCard(context),
           const SizedBox(height: 16),
           _professionalCard(context),
+          const SizedBox(height: 16),
+          _professionalReferencesCard(context),
           const SizedBox(height: 16),
           _serviceLocationCard(context),
           const SizedBox(height: 16),
@@ -730,6 +787,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Widget _fieldLabel(String text, {bool preserveCase = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        preserveCase ? text : text.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey.shade700,
+          letterSpacing: preserveCase ? 0 : 0.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _readOnlyValue(String value, {int maxLines = 1}) {
+    return Text(
+      value.isEmpty ? '—' : value,
+      style: const TextStyle(fontSize: 15, height: 1.35),
+      maxLines: maxLines,
+      overflow: maxLines > 1 ? TextOverflow.visible : TextOverflow.ellipsis,
+    );
+  }
+
   Widget _professionalCard(BuildContext context) {
     return _card(
       child: Column(
@@ -826,6 +907,71 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _saved.locumRole.isEmpty ? '—' : _saved.locumRole,
                   style: const TextStyle(fontSize: 15),
                 ),
+          const SizedBox(height: 16),
+          _fieldLabel('GPhC number (7 digits)', preserveCase: true),
+          _editing
+              ? TextField(
+                  controller: _gphcController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(7),
+                  ],
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    hintText: '1234567',
+                  ),
+                )
+              : _readOnlyValue(_saved.gphcNumber),
+        ],
+      ),
+    );
+  }
+
+  Widget _professionalReferencesCard(BuildContext context) {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _sectionTitle(Icons.people_outline, 'Professional references'),
+          const SizedBox(height: 20),
+          Text(
+            'Professional Reference 1',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF424242),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _fieldLabel('Name'),
+          _readOnlyValue(_saved.refName1),
+          const SizedBox(height: 12),
+          _fieldLabel('Phone number'),
+          _readOnlyValue(_saved.refPhone1),
+          const SizedBox(height: 12),
+          _fieldLabel('Details'),
+          _readOnlyValue(_saved.refDetails1, maxLines: 4),
+          const SizedBox(height: 24),
+          Text(
+            'Professional Reference 2',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF424242),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _fieldLabel('Name'),
+          _readOnlyValue(_saved.refName2),
+          const SizedBox(height: 12),
+          _fieldLabel('Phone number'),
+          _readOnlyValue(_saved.refPhone2),
+          const SizedBox(height: 12),
+          _fieldLabel('Details'),
+          _readOnlyValue(_saved.refDetails2, maxLines: 4),
         ],
       ),
     );

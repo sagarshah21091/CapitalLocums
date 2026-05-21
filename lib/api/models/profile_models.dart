@@ -57,12 +57,24 @@ class ProfileUser {
     required this.name,
     required this.email,
     required this.role,
+    this.refName1 = '',
+    this.refPhoneNumber1 = '',
+    this.refDetails1 = '',
+    this.refName2 = '',
+    this.refPhoneNumber2 = '',
+    this.refDetails2 = '',
   });
 
   final int id;
   final String name;
   final String email;
   final String role;
+  final String refName1;
+  final String refPhoneNumber1;
+  final String refDetails1;
+  final String refName2;
+  final String refPhoneNumber2;
+  final String refDetails2;
 
   factory ProfileUser.fromJson(Map<String, dynamic> json) {
     return ProfileUser(
@@ -70,6 +82,12 @@ class ProfileUser {
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       role: json['role'] as String? ?? '',
+      refName1: json['ref_Name_1'] as String? ?? '',
+      refPhoneNumber1: json['ref_PhoneNumber_1'] as String? ?? '',
+      refDetails1: json['ref_Details_1'] as String? ?? '',
+      refName2: json['ref_Name_2'] as String? ?? '',
+      refPhoneNumber2: json['ref_PhoneNumber_2'] as String? ?? '',
+      refDetails2: json['ref_Details_2'] as String? ?? '',
     );
   }
 }
@@ -105,6 +123,7 @@ class ProfileDetails {
     this.longitude,
     required this.travelDistance,
     this.locumRole,
+    this.gphcNumber = '',
     this.createdAt,
     this.updatedAt,
     this.coordinates,
@@ -120,6 +139,7 @@ class ProfileDetails {
   final String? longitude;
   final num travelDistance;
   final String? locumRole;
+  final String gphcNumber;
   final String? createdAt;
   final String? updatedAt;
   final ProfileCoordinates? coordinates;
@@ -137,6 +157,7 @@ class ProfileDetails {
       longitude: json['longitude']?.toString(),
       travelDistance: json['travel_distance'] as num? ?? 0,
       locumRole: json['locum_role'] as String?,
+      gphcNumber: json['gphc_number'] as String? ?? '',
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
       coordinates: coordsRaw is Map<String, dynamic>
@@ -163,6 +184,7 @@ class ProfileDetails {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       'locum_role': locumRole,
+      'gphc_number': gphcNumber,
       if (coords != null) 'coordinates': coords.toJson(),
     };
   }

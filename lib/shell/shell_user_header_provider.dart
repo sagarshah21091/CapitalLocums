@@ -18,6 +18,7 @@ String _formatLocumRole(String? apiRole) {
   final r = apiRole?.trim().toLowerCase() ?? '';
   if (r == 'technician') return 'Technician';
   if (r == 'pharmacist') return 'Pharmacist';
+  if (r == 'dispenser') return 'Dispenser';
   if (r.isEmpty) return '—';
   return r[0].toUpperCase() + r.substring(1);
 }
