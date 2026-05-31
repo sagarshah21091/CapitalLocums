@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/register_api.dart';
 import '../brand_colors.dart';
@@ -34,8 +35,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _qualificationsController = TextEditingController();
   final _experienceController = TextEditingController();
-  final _travelKmController = TextEditingController();
+  final _travelMilesController = TextEditingController();
   final _gphcController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _zipCodeController = TextEditingController();
+  final _dateOfBirthController = TextEditingController();
+  final _qualificationDateController = TextEditingController();
   final _proRef1NameController = TextEditingController();
   final _proRef1PhoneController = TextEditingController();
   final _proRef1DetailsController = TextEditingController();
@@ -46,6 +52,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true;
   bool _submitting = false;
   String _yourRole = 'Pharmacist';
+  String? _gender;
+  bool? _independentPrescriber;
+  bool _agreedPharmacistTc = false;
+  bool _agreedPrivacyPolicy = false;
+
+  static const _genderOptions = ['Male', 'Female', 'Other'];
+  static const _pharmacistTcUrl =
+      'https://www.capitallocums.co.uk/pharmacisttandcs';
+  static const _privacyPolicyUrl =
+      'https://www.capitallocums.co.uk/privacy-policy';
 
   @override
   void initState() {
@@ -63,12 +79,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   static const _yourRoleOptions = ['Pharmacist', 'Technician', 'Dispenser'];
 
-  static final _docSlots = <({String label, bool isRequired})>[
-    (label: 'Passport', isRequired: true),
-    (label: 'Visa/Work permit (if required)', isRequired: false),
-    (label: 'National insurance', isRequired: true),
-    (label: 'Qualification certificates', isRequired: true),
-  ];
+  static List<({int index, String label, bool isRequired})> _documentEntries(
+    bool isPharmacist,
+  ) {
+    return [
+      (index: RegisterDocSlot.passport, label: 'Passport', isRequired: true),
+      (
+        index: RegisterDocSlot.visaWorkPermit,
+        label: 'Visa/Work permit (if required)',
+        isRequired: false,
+      ),
+      (
+        index: RegisterDocSlot.nationalInsurance,
+        label: 'National insurance',
+        isRequired: true,
+      ),
+      (
+        index: RegisterDocSlot.qualificationCert,
+        label: 'Qualification certificates',
+        isRequired: true,
+      ),
+      if (isPharmacist)
+        (
+          index: RegisterDocSlot.dbsCheck,
+          label: 'DBS Check',
+          isRequired: true,
+        ),
+    ];
+  }
 
   static final _passwordSpecialCharPattern =
       RegExp(r'''[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/`~;']''');
@@ -115,8 +153,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _phoneController.dispose();
     _qualificationsController.dispose();
     _experienceController.dispose();
-    _travelKmController.dispose();
+    _travelMilesController.dispose();
     _gphcController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _zipCodeController.dispose();
+    _dateOfBirthController.dispose();
+    _qualificationDateController.dispose();
     _proRef1NameController.dispose();
     _proRef1PhoneController.dispose();
     _proRef1DetailsController.dispose();
@@ -224,6 +267,116 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  bool get _isPharmacist => _yourRole == 'Pharmacist';
+
+  String _formatDdMmYyyy(DateTime d) {
+    final day = d.day.toString().padLeft(2, '0');
+    final month = d.month.toString().padLeft(2, '0');
+    return '$day/$month/${d.year}';
+  }
+
+  String _dateToApi(String ddMmYyyy) {
+    final parts = ddMmYyyy.split('/');
+    if (parts.length != 3) return ddMmYyyy.trim();
+    final day = parts[0].padLeft(2, '0');
+    final month = parts[1].padLeft(2, '0');
+    final year = parts[2];
+    return '$year-$month-$day';
+  }
+
+  String? _validateDdMmYyyy(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return 'Required';
+    final parts = text.split('/');
+    if (parts.length != 3) return 'Use dd/mm/yyyy';
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) {
+      return 'Use dd/mm/yyyy';
+    }
+    if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) {
+      return 'Invalid date';
+    }
+    return null;
+  }
+
+  Future<void> _pickDate(
+    TextEditingController controller, {
+    required DateTime lastDate,
+    DateTime? initialDate,
+  }) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate ?? DateTime(now.year, now.month, now.day),
+      firstDate: DateTime(1900),
+      lastDate: lastDate,
+    );
+    if (!mounted || picked == null) return;
+    setState(() => controller.text = _formatDdMmYyyy(picked));
+  }
+
+  Future<void> _openExternalUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await canLaunchUrl(uri)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open link')),
+      );
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  static String _phoneForApiFromText(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('44')) {
+      digits = digits.substring(2);
+    }
+    if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    return '+44$digits';
+  }
+
+  String _phoneForApi() => _phoneForApiFromText(_phoneController.text);
+
+  Widget _dateField({
+    required TextEditingController controller,
+    required String hint,
+    required String? Function(String?) validator,
+    required DateTime lastDate,
+    DateTime? initialDate,
+  }) {
+    Future<void> pick() => _pickDate(
+          controller,
+          lastDate: lastDate,
+          initialDate: initialDate,
+        );
+    return TextFormField(
+      controller: controller,
+      readOnly: true,
+      decoration: _decoration(hint).copyWith(
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.calendar_today_outlined, size: 18),
+          onPressed: pick,
+        ),
+      ),
+      validator: validator,
+      onTap: pick,
+    );
+  }
+
+  Widget _phoneWithCountryCode() {
+    return _UkPhoneField(
+      controller: _phoneController,
+      decoration: _decoration,
+      radius: _radius,
+      border: _border,
+    );
+  }
+
   Future<void> _pickDocument(int index) async {
     final source = await _askDocPickSource();
     if (!mounted || source == null) return;
@@ -280,40 +433,49 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     ref.read(registerDocumentsProvider.notifier).setFile(index, image);
   }
 
-  Future<void> _onRegister() async {
-    if (_submitting) return;
-    if (!_formKey.currentState!.validate()) return;
+  String? _validateExperience(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Required';
+    final n = int.tryParse(value.trim());
+    if (n == null || n < 0) return 'Enter a valid number';
+    return null;
+  }
 
+  String? _validateTravelMiles(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Required';
+    final n = double.tryParse(value.trim());
+    if (n == null || n < 0) return 'Enter a valid number';
+    return null;
+  }
+
+  String? _validateDocuments() {
     final docs = ref.read(registerDocumentsProvider);
-    for (var i = 0; i < _docSlots.length; i++) {
-      if (_docSlots[i].isRequired && docs[i] == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Please attach: ${_docSlots[i].label}',
-            ),
-          ),
-        );
-        return;
+    for (final entry in _documentEntries(_isPharmacist)) {
+      if (entry.isRequired && docs[entry.index] == null) {
+        return 'Please attach: ${entry.label}';
       }
     }
+    return null;
+  }
+
+  String? _validateTermsAgreements() {
+    if (!_agreedPharmacistTc || !_agreedPrivacyPolicy) {
+      return 'Please agree to the Pharmacist T&Cs and Privacy Policy';
+    }
+    return null;
+  }
+
+  Future<void> _onRegister() async {
+    if (_submitting) return;
+    FocusScope.of(context).unfocus();
+    if (!_formKey.currentState!.validate()) return;
 
     final experience = int.tryParse(_experienceController.text.trim());
-    if (experience == null || experience < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid experience (years).')),
-      );
+    final travelMiles = double.tryParse(_travelMilesController.text.trim());
+    if (experience == null || travelMiles == null) {
       return;
     }
 
-    final travelKm = double.tryParse(_travelKmController.text.trim());
-    if (travelKm == null || travelKm < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid travel distance (km).')),
-      );
-      return;
-    }
-
+    final docs = ref.read(registerDocumentsProvider);
     final picked = ref.read(registerLocationProvider);
 
     setState(() => _submitting = true);
@@ -325,22 +487,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             location: _locationController.text,
             latitude: picked?.latitude ?? 0,
             longitude: picked?.longitude ?? 0,
-            phone: _phoneController.text,
+            phone: _phoneForApi(),
             qualifications: _qualificationsController.text,
             experienceYears: experience,
             locumRole: _locumRoleForApi(),
-            travelDistanceKm: travelKm,
+            travelDistanceMiles: travelMiles,
             gphcNumber: _gphcController.text.trim(),
+            address: _addressController.text,
+            city: _cityController.text,
+            zipCode: _zipCodeController.text,
+            dateOfBirth: _dateToApi(_dateOfBirthController.text.trim()),
+            gender: _gender!,
+            qualificationDate:
+                _dateToApi(_qualificationDateController.text.trim()),
+            independentPrescriber: _isPharmacist
+                ? (_independentPrescriber! ? '1' : '0')
+                : null,
+            agreedPharmacistTerms: _agreedPharmacistTc,
+            agreedPrivacyPolicy: _agreedPrivacyPolicy,
             passport: docs[RegisterDocSlot.passport]!,
             nationalInsurance: docs[RegisterDocSlot.nationalInsurance]!,
             qualificationCert: docs[RegisterDocSlot.qualificationCert]!,
             professionalReference1Name: _proRef1NameController.text,
-            professionalReference1Phone: _proRef1PhoneController.text,
+            professionalReference1Phone:
+                _phoneForApiFromText(_proRef1PhoneController.text),
             professionalReference1Details: _proRef1DetailsController.text,
             professionalReference2Name: _proRef2NameController.text,
-            professionalReference2Phone: _proRef2PhoneController.text,
+            professionalReference2Phone:
+                _phoneForApiFromText(_proRef2PhoneController.text),
             professionalReference2Details: _proRef2DetailsController.text,
             visaWorkPermit: docs[RegisterDocSlot.visaWorkPermit],
+            dbsCheck: _isPharmacist ? docs[RegisterDocSlot.dbsCheck] : null,
           );
 
       if (!mounted) return;
@@ -396,9 +573,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             constraints: const BoxConstraints(maxWidth: 920),
             child: Form(
               key: _formKey,
-              child: ListView(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   _RegisterHeader(),
                   const SizedBox(height: 28),
                   _twoCol(
@@ -478,14 +657,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _requiredLabel('Phone', isRequired: true),
-                        TextFormField(
-                          controller: _phoneController,
-                          decoration: _decoration('Enter contact number'),
-                          keyboardType: TextInputType.phone,
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
-                          textInputAction: TextInputAction.next,
-                        ),
+                        _phoneWithCountryCode(),
                       ],
                     ),
                     right: Column(
@@ -516,8 +688,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
+                          validator: _validateExperience,
                           textInputAction: TextInputAction.next,
                         ),
                       ],
@@ -525,16 +696,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     right: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _requiredLabel('Travel distance (km)', isRequired: true),
+                        _requiredLabel('Travel distance (miles)', isRequired: true),
                         TextFormField(
-                          controller: _travelKmController,
+                          controller: _travelMilesController,
                           decoration: _decoration('e.g. 25'),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
+                          validator: _validateTravelMiles,
                           textInputAction: TextInputAction.done,
                         ),
                       ],
@@ -563,8 +733,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (v) =>
-                                  setState(() => _yourRole = v ?? _yourRole),
+                              onChanged: (v) {
+                                if (v == null) return;
+                                setState(() {
+                                  _yourRole = v;
+                                  if (v != 'Pharmacist') {
+                                    _independentPrescriber = null;
+                                    ref
+                                        .read(
+                                          registerDocumentsProvider.notifier,
+                                        )
+                                        .setFile(
+                                          RegisterDocSlot.dbsCheck,
+                                          null,
+                                        );
+                                  }
+                                });
+                              },
                             ),
                           ),
                         ),
@@ -599,10 +784,166 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _requiredLabel('Address', isRequired: true),
+                  TextFormField(
+                    controller: _addressController,
+                    decoration: _decoration('Street address'),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Required' : null,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 16),
+                  _threeCol(
+                    wide: wide,
+                    a: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _requiredLabel('City', isRequired: true),
+                        TextFormField(
+                          controller: _cityController,
+                          decoration: _decoration('City'),
+                          validator: (v) =>
+                              v == null || v.trim().isEmpty ? 'Required' : null,
+                          textInputAction: TextInputAction.next,
+                        ),
+                      ],
+                    ),
+                    b: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _requiredLabel('Zip code', isRequired: true),
+                        TextFormField(
+                          controller: _zipCodeController,
+                          decoration: _decoration('Postcode'),
+                          validator: (v) =>
+                              v == null || v.trim().isEmpty ? 'Required' : null,
+                          textInputAction: TextInputAction.next,
+                        ),
+                      ],
+                    ),
+                    c: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _requiredLabel('Date of birth', isRequired: true),
+                        _dateField(
+                          controller: _dateOfBirthController,
+                          hint: 'dd/mm/yyyy',
+                          validator: _validateDdMmYyyy,
+                          lastDate: DateTime.now(),
+                          initialDate: DateTime.now(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _threeCol(
+                    wide: wide,
+                    a: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _requiredLabel('Gender', isRequired: true),
+                        FormField<String>(
+                          initialValue: _gender,
+                          validator: (v) => v == null ? 'Required' : null,
+                          builder: (field) {
+                            return InputDecorator(
+                              decoration: _decoration('Select gender').copyWith(
+                                errorText: field.errorText,
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: field.value,
+                                  isExpanded: true,
+                                  isDense: true,
+                                  hint: const Text('Select gender'),
+                                  items: _genderOptions
+                                      .map(
+                                        (e) => DropdownMenuItem(
+                                          value: e,
+                                          child: Text(e),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) {
+                                    field.didChange(v);
+                                    setState(() => _gender = v);
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    b: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _requiredLabel('Qualification date', isRequired: true),
+                        _dateField(
+                          controller: _qualificationDateController,
+                          hint: 'dd/mm/yyyy',
+                          validator: _validateDdMmYyyy,
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          initialDate: DateTime.now(),
+                        ),
+                      ],
+                    ),
+                    c: _isPharmacist
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _requiredLabel(
+                                'Independent prescriber',
+                                isRequired: true,
+                              ),
+                              FormField<bool?>(
+                                key: ValueKey(
+                                  'independent_prescriber_$_yourRole',
+                                ),
+                                initialValue: _independentPrescriber,
+                                validator: (value) =>
+                                    value == null ? 'Required' : null,
+                                builder: (field) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      _IndependentPrescriberField(
+                                        value: field.value,
+                                        onChanged: (v) {
+                                          field.didChange(v);
+                                          setState(
+                                            () => _independentPrescriber = v,
+                                          );
+                                        },
+                                      ),
+                                      if (field.hasError)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(top: 6),
+                                          child: Text(
+                                            field.errorText!,
+                                            style: const TextStyle(
+                                              color: Colors.red,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                   const SizedBox(height: 28),
                   _ProfessionalReferencesSection(
                     requiredLabel: _requiredLabel,
                     decoration: _decoration,
+                    radius: _radius,
+                    border: _border,
                     proRef1Name: _proRef1NameController,
                     proRef1Phone: _proRef1PhoneController,
                     proRef1Details: _proRef1DetailsController,
@@ -611,17 +952,82 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     proRef2Details: _proRef2DetailsController,
                   ),
                   const SizedBox(height: 28),
-                  _DocumentsCard(
-                    docSlots: _docSlots,
-                    docFiles: docFiles,
-                    onPick: _pickDocument,
-                    onClear: (index) {
-                      ref
-                          .read(registerDocumentsProvider.notifier)
-                          .setFile(index, null);
+                  FormField<void>(
+                    key: ValueKey('documents_$_isPharmacist'),
+                    validator: (_) => _validateDocuments(),
+                    builder: (field) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _DocumentsCard(
+                            docSlots: _documentEntries(_isPharmacist),
+                            docFiles: docFiles,
+                            onPick: (index) async {
+                              await _pickDocument(index);
+                              field.didChange(null);
+                            },
+                            onClear: (index) {
+                              ref
+                                  .read(registerDocumentsProvider.notifier)
+                                  .setFile(index, null);
+                              field.didChange(null);
+                            },
+                            borderColor: _border,
+                            radius: _radius,
+                            hasError: field.hasError,
+                          ),
+                          if (field.hasError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                field.errorText!,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
                     },
-                    borderColor: _border,
-                    radius: _radius,
+                  ),
+                  const SizedBox(height: 28),
+                  FormField<void>(
+                    validator: (_) => _validateTermsAgreements(),
+                    builder: (field) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _PharmacistTermsSection(
+                            agreedPharmacistTc: _agreedPharmacistTc,
+                            agreedPrivacyPolicy: _agreedPrivacyPolicy,
+                            onPharmacistTcChanged: (v) {
+                              setState(() => _agreedPharmacistTc = v);
+                              field.didChange(null);
+                            },
+                            onPrivacyPolicyChanged: (v) {
+                              setState(() => _agreedPrivacyPolicy = v);
+                              field.didChange(null);
+                            },
+                            onOpenUrl: _openExternalUrl,
+                            pharmacistTcUrl: _pharmacistTcUrl,
+                            privacyPolicyUrl: _privacyPolicyUrl,
+                            hasError: field.hasError,
+                          ),
+                          if (field.hasError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                field.errorText!,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 28),
                   SizedBox(
@@ -683,7 +1089,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -716,12 +1123,367 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ],
     );
   }
+
+  Widget _threeCol({
+    required bool wide,
+    required Widget a,
+    required Widget b,
+    required Widget c,
+  }) {
+    if (wide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: a),
+          const SizedBox(width: 12),
+          Expanded(child: b),
+          const SizedBox(width: 12),
+          Expanded(child: c),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        a,
+        const SizedBox(height: 16),
+        b,
+        const SizedBox(height: 16),
+        c,
+      ],
+    );
+  }
+}
+
+class _IndependentPrescriberField extends StatelessWidget {
+  const _IndependentPrescriberField({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final bool? value;
+  final ValueChanged<bool?> onChanged;
+
+  static const _radius = 8.0;
+  static const _border = Color(0xFFE0E0E0);
+
+  Widget _option({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(_radius),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(_radius),
+            border: Border.all(color: _border),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.check_box
+                    : Icons.check_box_outline_blank,
+                size: 20,
+                color: selected ? BrandColors.primaryBlue : Colors.grey,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _option(
+          label: 'Yes',
+          selected: value == true,
+          onTap: () => onChanged(true),
+        ),
+        const SizedBox(width: 12),
+        _option(
+          label: 'No',
+          selected: value == false,
+          onTap: () => onChanged(false),
+        ),
+      ],
+    );
+  }
+}
+
+class _PharmacistTermsSection extends StatelessWidget {
+  const _PharmacistTermsSection({
+    required this.agreedPharmacistTc,
+    required this.agreedPrivacyPolicy,
+    required this.onPharmacistTcChanged,
+    required this.onPrivacyPolicyChanged,
+    required this.onOpenUrl,
+    required this.pharmacistTcUrl,
+    required this.privacyPolicyUrl,
+    this.hasError = false,
+  });
+
+  final bool agreedPharmacistTc;
+  final bool agreedPrivacyPolicy;
+  final ValueChanged<bool> onPharmacistTcChanged;
+  final ValueChanged<bool> onPrivacyPolicyChanged;
+  final Future<void> Function(String url) onOpenUrl;
+  final String pharmacistTcUrl;
+  final String privacyPolicyUrl;
+  final bool hasError;
+
+  static const _border = Color(0xFFE0E0E0);
+  static const _linkBlue = BrandColors.primaryBlue;
+
+  Widget _linkText(String label, String url) {
+    return GestureDetector(
+      onTap: () => onOpenUrl(url),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: _linkBlue,
+          decoration: TextDecoration.underline,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+    );
+  }
+
+  Widget _agreementBox({
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required Widget label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Checkbox(
+            value: value,
+            onChanged: (v) => onChanged(v ?? false),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 4),
+          Expanded(child: label),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 720;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasError ? Colors.red.shade700 : _border,
+          width: hasError ? 1.4 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Pharmacist T&Cs',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF424242),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 0,
+            runSpacing: 4,
+            children: [
+              const Text(
+                'Please check each box to confirm that you have read and agree to the ',
+                style: TextStyle(fontSize: 13, color: Color(0xFF424242)),
+              ),
+              _linkText('Capital Locum pharmacist terms and conditions', pharmacistTcUrl),
+              const Text(
+                ' and ',
+                style: TextStyle(fontSize: 13, color: Color(0xFF424242)),
+              ),
+              _linkText('Capital Locum data and privacy policy', privacyPolicyUrl),
+              const Text(
+                '.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF424242)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (wide)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _agreementBox(
+                    value: agreedPharmacistTc,
+                    onChanged: onPharmacistTcChanged,
+                    label: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text(
+                          'I agree to the ',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        _linkText('Pharmacist T&Cs', pharmacistTcUrl),
+                        const Text('.', style: TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _agreementBox(
+                    value: agreedPrivacyPolicy,
+                    onChanged: onPrivacyPolicyChanged,
+                    label: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text(
+                          'I agree to the ',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        _linkText('Privacy Policy', privacyPolicyUrl),
+                        const Text('.', style: TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            _agreementBox(
+              value: agreedPharmacistTc,
+              onChanged: onPharmacistTcChanged,
+              label: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text('I agree to the ', style: TextStyle(fontSize: 13)),
+                  _linkText('Pharmacist T&Cs', pharmacistTcUrl),
+                  const Text('.', style: TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _agreementBox(
+              value: agreedPrivacyPolicy,
+              onChanged: onPrivacyPolicyChanged,
+              label: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text('I agree to the ', style: TextStyle(fontSize: 13)),
+                  _linkText('Privacy Policy', privacyPolicyUrl),
+                  const Text('.', style: TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _UkPhoneField extends StatelessWidget {
+  const _UkPhoneField({
+    required this.controller,
+    required this.decoration,
+    required this.radius,
+    required this.border,
+  });
+
+  final TextEditingController controller;
+  final InputDecoration Function(String hint) decoration;
+  final double radius;
+  final Color border;
+
+  static const _labelColor = Color(0xFF424242);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: border),
+          ),
+          child: const Text(
+            '+44',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _labelColor,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextFormField(
+            controller: controller,
+            decoration: decoration('Enter phone number'),
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            validator: (v) {
+              final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
+              if (digits.isEmpty) return 'Required';
+              if (digits.length < 9) return 'Enter a valid UK number';
+              return null;
+            },
+            textInputAction: TextInputAction.next,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _ProfessionalReferencesSection extends StatelessWidget {
   const _ProfessionalReferencesSection({
     required this.requiredLabel,
     required this.decoration,
+    required this.radius,
+    required this.border,
     required this.proRef1Name,
     required this.proRef1Phone,
     required this.proRef1Details,
@@ -732,6 +1494,8 @@ class _ProfessionalReferencesSection extends StatelessWidget {
 
   final Widget Function(String text, {required bool isRequired}) requiredLabel;
   final InputDecoration Function(String hint) decoration;
+  final double radius;
+  final Color border;
   final TextEditingController proRef1Name;
   final TextEditingController proRef1Phone;
   final TextEditingController proRef1Details;
@@ -770,13 +1534,11 @@ class _ProfessionalReferencesSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         requiredLabel('Phone number', isRequired: true),
-        TextFormField(
+        _UkPhoneField(
           controller: phone,
-          decoration: decoration('Enter phone number'),
-          keyboardType: TextInputType.phone,
-          validator: (v) =>
-              v == null || v.trim().isEmpty ? 'Required' : null,
-          textInputAction: TextInputAction.next,
+          decoration: decoration,
+          radius: radius,
+          border: border,
         ),
         const SizedBox(height: 12),
         requiredLabel('Details', isRequired: true),
@@ -800,7 +1562,7 @@ class _ProfessionalReferencesSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        border: Border.all(color: border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -885,14 +1647,16 @@ class _DocumentsCard extends StatelessWidget {
     required this.onClear,
     required this.borderColor,
     required this.radius,
+    this.hasError = false,
   });
 
-  final List<({String label, bool isRequired})> docSlots;
+  final List<({int index, String label, bool isRequired})> docSlots;
   final List<XFile?> docFiles;
-  final void Function(int index) onPick;
+  final Future<void> Function(int index) onPick;
   final void Function(int index) onClear;
   final Color borderColor;
   final double radius;
+  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
@@ -901,7 +1665,10 @@ class _DocumentsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
+        border: Border.all(
+          color: hasError ? Colors.red.shade700 : borderColor,
+          width: hasError ? 1.4 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -939,16 +1706,15 @@ class _DocumentsCard extends StatelessWidget {
     required bool wide,
   }) {
     final children = <Widget>[];
-    for (var i = 0; i < docSlots.length; i++) {
-      final slot = docSlots[i];
+    for (final slot in docSlots) {
       children.add(
         _DocUploadRow(
                 label: slot.label,
                 isRequired: slot.isRequired,
-                fileName: docFiles[i]?.name,
-                onChoose: () => onPick(i),
-                onClear: docFiles[i] != null
-                    ? () => onClear(i)
+                fileName: docFiles[slot.index]?.name,
+                onChoose: () => onPick(slot.index),
+                onClear: docFiles[slot.index] != null
+                    ? () => onClear(slot.index)
                     : null,
                 borderColor: borderColor,
                 radius: radius,

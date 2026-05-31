@@ -25,8 +25,17 @@ class RegisterApi {
     required String qualifications,
     required int experienceYears,
     required String locumRole,
-    required double travelDistanceKm,
+    required double travelDistanceMiles,
     required String gphcNumber,
+    required String address,
+    required String city,
+    required String zipCode,
+    required String dateOfBirth,
+    required String gender,
+    required String qualificationDate,
+    String? independentPrescriber,
+    required bool agreedPharmacistTerms,
+    required bool agreedPrivacyPolicy,
     required XFile passport,
     required XFile nationalInsurance,
     required XFile qualificationCert,
@@ -37,6 +46,7 @@ class RegisterApi {
     required String professionalReference2Phone,
     required String professionalReference2Details,
     XFile? visaWorkPermit,
+    XFile? dbsCheck,
   }) async {
     final formData = FormData();
 
@@ -55,8 +65,19 @@ class RegisterApi {
     addField('qualifications', qualifications.trim());
     addField('experience_years', '$experienceYears');
     addField('locum_role', locumRole.trim().toLowerCase());
-    addField('travel_distance', '$travelDistanceKm');
+    addField('travel_distance', '$travelDistanceMiles');
     addField('gphc_number', gphcNumber.trim());
+    addField('address', address.trim());
+    addField('city', city.trim());
+    addField('zip_code', zipCode.trim());
+    addField('dob', dateOfBirth.trim());
+    addField('gender', gender.trim().toLowerCase());
+    addField('qualification_date', qualificationDate.trim());
+    if (independentPrescriber != null && independentPrescriber.trim().isNotEmpty) {
+      addField('independent_prescriber', independentPrescriber.trim());
+    }
+    // addField('agreed_pharmacist_terms', agreedPharmacistTerms ? 'true' : 'false');
+    // addField('agreed_privacy_policy', agreedPrivacyPolicy ? 'true' : 'false');
     addField('ref_Name_1', professionalReference1Name.trim());
     addField('ref_PhoneNumber_1', professionalReference1Phone.trim());
     addField(
@@ -82,6 +103,9 @@ class RegisterApi {
       }
       await addFile('national_insurance', nationalInsurance);
       await addFile('qualification_certificates', qualificationCert);
+      if (dbsCheck != null) {
+        await addFile('dbs_check', dbsCheck);
+      }
 
       final response = await _dio.post<Map<String, dynamic>>(
         '/auth/register',
