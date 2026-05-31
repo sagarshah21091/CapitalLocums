@@ -1,4 +1,7 @@
+import 'dart:developer' as developer;
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'dio_factory.dart';
 import 'dio_error_message.dart';
@@ -64,13 +67,29 @@ class ShiftsApi {
     }
   }
 
-  /// GET `/shifts/:id`
+  /// GET `/shifts/:id` — Bearer auth only (matches portal API).
   Future<ShiftDetailResponse> fetchShiftDetail(int shiftId) async {
     try {
+      if (kDebugMode) {
+        developer.log(
+          'Fetching shift detail for id: $shiftId',
+          name: 'CapitalLocums.Shifts',
+        );
+      }
       final response = await _dio.get<Map<String, dynamic>>('/shifts/$shiftId');
       final data = response.data;
       if (data == null) {
         throw ShiftsApiException('Empty response from server.');
+      }
+      if (kDebugMode) {
+        final shift = data['shift'];
+        if (shift is Map) {
+          developer.log(
+            'Shift response: id=${shift['id']}, location=${shift['location']}, '
+            'locum_role=${shift['locum_role']}, start_time=${shift['start_time']}',
+            name: 'CapitalLocums.Shifts',
+          );
+        }
       }
       return ShiftDetailResponse.fromJson(data);
     } on DioException catch (e) {

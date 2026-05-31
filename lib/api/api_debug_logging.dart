@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 
 /// Attaches verbose HTTP logging in debug/profile tooling builds only.
 ///
-/// Passwords, JWTs, and password hashes are redacted from logs.
+/// Passwords and password hashes are redacted; auth tokens are logged in full.
 void attachApiDebugLogging(Dio dio) {
   if (!kDebugMode) {
     return;
@@ -127,34 +127,21 @@ Object? _sanitizeJson(Object? raw) {
     for (final e in raw.entries) {
       copy[e.key.toString()] = _sanitizeJson(e.value);
     }
-    _sanitizeAuthFieldsInPlace(copy);
+    _redactPasswordFieldsInPlace(copy);
     return copy;
   }
   return raw;
 }
 
-void _sanitizeAuthFieldsInPlace(Map<String, dynamic> map) {
+void _redactPasswordFieldsInPlace(Map<String, dynamic> map) {
   if (map.containsKey('password')) {
     map['password'] = '***redacted***';
   }
   if (map.containsKey('password_hash')) {
     map['password_hash'] = '***redacted***';
   }
-  if (map['token'] is String) {
-    final t = map['token'] as String;
-    map['token'] = t.isEmpty
-        ? '(empty)'
-        : '${t.substring(0, t.length > 16 ? 16 : t.length)}… (${t.length} chars)';
-  }
 }
 
 Map<String, dynamic> _sanitizeHeaders(Map<String, dynamic> headers) {
-  final copy = Map<String, dynamic>.from(headers);
-  for (final key in copy.keys.toList()) {
-    final lower = key.toLowerCase();
-    if (lower == 'authorization' && copy[key] != null) {
-      copy[key] = '***redacted***';
-    }
-  }
-  return copy;
+  return Map<String, dynamic>.from(headers);
 }

@@ -7,6 +7,7 @@ import 'auth/auth_repository.dart';
 import 'auth/auth_session.dart';
 import 'brand_colors.dart';
 import 'router/app_router.dart';
+import 'shell/shell_user_header_provider.dart';
 
 /// Login layout inspired by the reference: logo + name, soft-filled fields, primary CTA.
 class LoginScreen extends ConsumerStatefulWidget {
@@ -137,6 +138,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
       ref.read(authSessionProvider.notifier).markAuthenticated();
+      refreshShellUserHeader(ref);
       context.go(AppRoute.dashboard);
     } on AuthFailure catch (e) {
       if (!mounted) {

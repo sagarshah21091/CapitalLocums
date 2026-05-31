@@ -9,6 +9,7 @@ import '../brand_colors.dart';
 import '../env/app_env.dart';
 import '../register/register_location_autocomplete.dart';
 import '../register/register_location_provider.dart';
+import '../shell/shell_user_header_provider.dart';
 import 'profile_providers.dart';
 import 'profile_repository.dart';
 
@@ -21,8 +22,15 @@ class _ProfileData {
     required this.qualifications,
     required this.experienceYears,
     required this.locumRole,
-    required this.travelKm,
+    required this.travelMiles,
     required this.gphcNumber,
+    required this.address,
+    required this.city,
+    required this.zipCode,
+    required this.dateOfBirth,
+    required this.gender,
+    required this.qualificationDate,
+    required this.independentPrescriber,
     required this.refName1,
     required this.refPhone1,
     required this.refDetails1,
@@ -38,14 +46,23 @@ class _ProfileData {
   final String qualifications;
   final String experienceYears;
   final String locumRole;
-  final String travelKm;
+  final String travelMiles;
   final String gphcNumber;
+  final String address;
+  final String city;
+  final String zipCode;
+  final String dateOfBirth;
+  final String gender;
+  final String qualificationDate;
+  final String independentPrescriber;
   final String refName1;
   final String refPhone1;
   final String refDetails1;
   final String refName2;
   final String refPhone2;
   final String refDetails2;
+
+  bool get isPharmacist => locumRole == 'Pharmacist';
 }
 
 /// Locum profile: header, professional, service area, documents (GET `/profile`).
@@ -73,9 +90,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late final TextEditingController _experienceController;
   late final TextEditingController _travelKmController;
   late final TextEditingController _gphcController;
+  late final TextEditingController _addressController;
+  late final TextEditingController _cityController;
+  late final TextEditingController _zipCodeController;
+  late final TextEditingController _dobController;
+  late final TextEditingController _qualificationDateController;
+  late final TextEditingController _proRef1NameController;
+  late final TextEditingController _proRef1PhoneController;
+  late final TextEditingController _proRef1DetailsController;
+  late final TextEditingController _proRef2NameController;
+  late final TextEditingController _proRef2PhoneController;
+  late final TextEditingController _proRef2DetailsController;
+
   String _locumRole = 'Pharmacist';
+  String? _gender;
+  bool? _independentPrescriber;
 
   static const _roleOptions = ['Pharmacist', 'Technician', 'Dispenser'];
+  static const _genderOptions = ['Male', 'Female', 'Other'];
   static const _cardRadius = 12.0;
   static const _borderColor = Color(0xFFE0E0E0);
 
@@ -87,8 +119,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     qualifications: '',
     experienceYears: '',
     locumRole: 'Pharmacist',
-    travelKm: '',
+    travelMiles: '',
     gphcNumber: '',
+    address: '',
+    city: '',
+    zipCode: '',
+    dateOfBirth: '',
+    gender: '',
+    qualificationDate: '',
+    independentPrescriber: '',
     refName1: '',
     refPhone1: '',
     refDetails1: '',
@@ -96,6 +135,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     refPhone2: '',
     refDetails2: '',
   );
+
+  static String _firstNonEmpty(String a, String b, [String fallback = '']) {
+    if (a.trim().isNotEmpty) return a.trim();
+    if (b.trim().isNotEmpty) return b.trim();
+    return fallback;
+  }
 
   @override
   void initState() {
@@ -108,6 +153,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _experienceController = TextEditingController();
     _travelKmController = TextEditingController();
     _gphcController = TextEditingController();
+    _addressController = TextEditingController();
+    _cityController = TextEditingController();
+    _zipCodeController = TextEditingController();
+    _dobController = TextEditingController();
+    _qualificationDateController = TextEditingController();
+    _proRef1NameController = TextEditingController();
+    _proRef1PhoneController = TextEditingController();
+    _proRef1DetailsController = TextEditingController();
+    _proRef2NameController = TextEditingController();
+    _proRef2PhoneController = TextEditingController();
+    _proRef2DetailsController = TextEditingController();
     _locationController.addListener(_onLocationFieldChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
   }
@@ -130,6 +186,85 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       default:
         return 'pharmacist';
     }
+  }
+
+  static String _phoneDigitsForDisplay(String apiPhone) {
+    var digits = apiPhone.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('44')) digits = digits.substring(2);
+    if (digits.startsWith('0')) digits = digits.substring(1);
+    return digits;
+  }
+
+  static String _phoneForApiFromText(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('44')) digits = digits.substring(2);
+    if (digits.startsWith('0')) digits = digits.substring(1);
+    return '+44$digits';
+  }
+
+  bool? _independentFromDisplay(String display) {
+    final s = display.trim().toLowerCase();
+    if (s == 'yes') return true;
+    if (s == 'no') return false;
+    return null;
+  }
+
+  bool get _isPharmacistRole =>
+      _editing ? _locumRole == 'Pharmacist' : _saved.isPharmacist;
+
+  InputDecoration _inputDecoration({String? hint}) {
+    return InputDecoration(
+      hintText: hint,
+      isDense: true,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    );
+  }
+
+  Future<void> _pickDate(TextEditingController controller) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year, now.month, now.day),
+      firstDate: DateTime(1900),
+      lastDate: controller == _qualificationDateController
+          ? now.add(const Duration(days: 365))
+          : now,
+    );
+    if (!mounted || picked == null) return;
+    final day = picked.day.toString().padLeft(2, '0');
+    final month = picked.month.toString().padLeft(2, '0');
+    setState(() => controller.text = '$day/$month/${picked.year}');
+  }
+
+  Widget _dateField(TextEditingController controller, {String hint = 'dd/mm/yyyy'}) {
+    return TextField(
+      controller: controller,
+      readOnly: true,
+      decoration: _inputDecoration(hint: hint).copyWith(
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.calendar_today_outlined, size: 18),
+          onPressed: () => _pickDate(controller),
+        ),
+      ),
+      onTap: () => _pickDate(controller),
+    );
+  }
+
+  Widget _editableField({
+    required TextEditingController controller,
+    String? hint,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      maxLines: maxLines,
+      decoration: _inputDecoration(hint: hint),
+    );
   }
 
   void _seedLocationFromProfile(ProfileDetails profile) {
@@ -159,6 +294,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final displayEmail = email ?? _saved.email;
     final role = _displayLocumRole(profile.locumRole);
 
+    final address = _firstNonEmpty(
+      user?.address ?? '',
+      profile.address,
+    );
+    final city = _firstNonEmpty(user?.city ?? '', profile.city);
+    final zipCode = _firstNonEmpty(user?.zipCode ?? '', profile.zipCode);
+    final dobRaw = _firstNonEmpty(user?.dob ?? '', profile.dob);
+    final genderRaw = _firstNonEmpty(user?.gender ?? '', profile.gender);
+    final qualDateRaw = _firstNonEmpty(
+      user?.qualificationDate ?? '',
+      profile.qualificationDate,
+    );
+    final indepRaw = _firstNonEmpty(
+      user?.independentPrescriber ?? '',
+      profile.independentPrescriber,
+    );
+
     _saved = _ProfileData(
       name: displayName,
       email: displayEmail,
@@ -167,8 +319,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       qualifications: profile.qualifications.trim(),
       experienceYears: '${profile.experienceYears}',
       locumRole: role,
-      travelKm: '${profile.travelDistance}',
+      travelMiles: '${profile.travelDistance}',
       gphcNumber: profile.gphcNumber.trim(),
+      address: address,
+      city: city,
+      zipCode: zipCode,
+      dateOfBirth: ProfileDetails.formatDobForDisplay(dobRaw),
+      gender: ProfileDetails.formatGender(genderRaw),
+      qualificationDate:
+          ProfileDetails.formatDobForDisplay(qualDateRaw),
+      independentPrescriber:
+          ProfileDetails.formatIndependentPrescriber(indepRaw),
       refName1: user?.refName1.trim() ?? _saved.refName1,
       refPhone1: user?.refPhoneNumber1.trim() ?? _saved.refPhone1,
       refDetails1: user?.refDetails1.trim() ?? _saved.refDetails1,
@@ -178,13 +339,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
 
     _nameController.text = displayName;
-    _phoneController.text = _saved.phone;
+    _phoneController.text = _phoneDigitsForDisplay(_saved.phone);
     _locationController.text = _saved.location;
     _qualificationsController.text = _saved.qualifications;
     _experienceController.text = _saved.experienceYears;
-    _travelKmController.text = _saved.travelKm;
+    _travelKmController.text = _saved.travelMiles;
     _gphcController.text = _saved.gphcNumber;
+    _addressController.text = _saved.address;
+    _cityController.text = _saved.city;
+    _zipCodeController.text = _saved.zipCode;
+    _dobController.text = _saved.dateOfBirth;
+    _qualificationDateController.text = _saved.qualificationDate;
+    _proRef1NameController.text = _saved.refName1;
+    _proRef1PhoneController.text = _phoneDigitsForDisplay(_saved.refPhone1);
+    _proRef1DetailsController.text = _saved.refDetails1;
+    _proRef2NameController.text = _saved.refName2;
+    _proRef2PhoneController.text = _phoneDigitsForDisplay(_saved.refPhone2);
+    _proRef2DetailsController.text = _saved.refDetails2;
     _locumRole = role;
+    _gender = _saved.gender.isEmpty ? null : _saved.gender;
+    _independentPrescriber =
+        _independentFromDisplay(_saved.independentPrescriber);
   }
 
   void _applyPayload(ProfilePayload payload) {
@@ -207,7 +382,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  ProfileDetails? _buildUpdateBody() {
+  ProfileDetails? _buildProfileDetailsForUpdate() {
     final base = _serverProfile;
     if (base == null) return null;
 
@@ -232,7 +407,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return ProfileDetails(
       id: base.id,
       userId: base.userId,
-      phone: _phoneController.text.trim(),
+      phone: _phoneForApiFromText(_phoneController.text),
       qualifications: _qualificationsController.text.trim(),
       experienceYears: experience,
       location: location,
@@ -241,10 +416,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       travelDistance: travel,
       locumRole: _apiLocumRole(_locumRole),
       gphcNumber: _gphcController.text.trim(),
+      address: _addressController.text.trim(),
+      city: _cityController.text.trim(),
+      zipCode: _zipCodeController.text.trim(),
+      dob: ProfileDetails.dateToApi(_dobController.text),
+      gender: (_gender ?? '').toLowerCase(),
+      qualificationDate:
+          ProfileDetails.dateToApi(_qualificationDateController.text),
+      independentPrescriber: _locumRole == 'Pharmacist' &&
+              _independentPrescriber != null
+          ? (_independentPrescriber! ? '1' : '0')
+          : '',
       createdAt: base.createdAt,
       updatedAt: base.updatedAt,
       coordinates: ProfileCoordinates(x: lng, y: lat),
     );
+  }
+
+  Map<String, dynamic>? _buildUpdatePayload() {
+    final profile = _buildProfileDetailsForUpdate();
+    if (profile == null) return null;
+
+    final payload = profile.toJson();
+    payload['name'] = _nameController.text.trim();
+    payload['ref_Name_1'] = _proRef1NameController.text.trim();
+    payload['ref_PhoneNumber_1'] =
+        _phoneForApiFromText(_proRef1PhoneController.text);
+    payload['ref_Details_1'] = _proRef1DetailsController.text.trim();
+    payload['ref_Name_2'] = _proRef2NameController.text.trim();
+    payload['ref_PhoneNumber_2'] =
+        _phoneForApiFromText(_proRef2PhoneController.text);
+    payload['ref_Details_2'] = _proRef2DetailsController.text.trim();
+    return payload;
   }
 
   String? _validateEditLocation(String? v) {
@@ -300,6 +503,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _experienceController.dispose();
     _travelKmController.dispose();
     _gphcController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _zipCodeController.dispose();
+    _dobController.dispose();
+    _qualificationDateController.dispose();
+    _proRef1NameController.dispose();
+    _proRef1PhoneController.dispose();
+    _proRef1DetailsController.dispose();
+    _proRef2NameController.dispose();
+    _proRef2PhoneController.dispose();
+    _proRef2DetailsController.dispose();
     super.dispose();
   }
 
@@ -314,21 +528,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   void _cancelEdit() {
     ref.read(registerLocationProvider.notifier).clear();
-    _nameController.text = _saved.name;
-    _phoneController.text = _saved.phone;
-    _locationController.text = _saved.location;
-    _qualificationsController.text = _saved.qualifications;
-    _experienceController.text = _saved.experienceYears;
-    _travelKmController.text = _saved.travelKm;
-    _gphcController.text = _saved.gphcNumber;
     final profile = _serverProfile;
     if (profile != null) {
+      _applyProfileDetails(
+        profile,
+        name: _saved.name,
+        email: _saved.email,
+      );
       _seedLocationFromProfile(profile);
     }
-    setState(() {
-      _locumRole = _saved.locumRole;
-      _editing = false;
-    });
+    setState(() => _editing = false);
   }
 
   Future<void> _saveEdit() async {
@@ -355,8 +564,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       return;
     }
 
-    final body = _buildUpdateBody();
-    if (body == null) {
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name is required.')),
+      );
+      return;
+    }
+    if (_gender == null || _gender!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select gender.')),
+      );
+      return;
+    }
+    if (_locumRole == 'Pharmacist' && _independentPrescriber == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Independent Prescriber (Yes or No).'),
+        ),
+      );
+      return;
+    }
+
+    final payload = _buildUpdatePayload();
+    if (payload == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Check experience years and travel distance.'),
@@ -383,16 +613,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _saving = true);
     try {
       final result =
-          await ref.read(profileRepositoryProvider).updateProfile(body);
+          await ref.read(profileRepositoryProvider).updateProfile(payload);
       if (!mounted) return;
-      final updated = result.data!;
+      final base = _serverProfile!;
+      final updated = result.data!.mergeWith(base);
+      final mergedUser = ProfileUser(
+        id: base.userId,
+        name: _nameController.text.trim(),
+        email: _saved.email,
+        role: 'locum',
+        address: _addressController.text.trim(),
+        city: _cityController.text.trim(),
+        zipCode: _zipCodeController.text.trim(),
+        dob: ProfileDetails.dateToApi(_dobController.text),
+        gender: _gender!.toLowerCase(),
+        qualificationDate:
+            ProfileDetails.dateToApi(_qualificationDateController.text),
+        independentPrescriber: _locumRole == 'Pharmacist' &&
+                _independentPrescriber != null
+            ? (_independentPrescriber! ? '1' : '0')
+            : '',
+        refName1: _proRef1NameController.text.trim(),
+        refPhoneNumber1:
+            _phoneForApiFromText(_proRef1PhoneController.text),
+        refDetails1: _proRef1DetailsController.text.trim(),
+        refName2: _proRef2NameController.text.trim(),
+        refPhoneNumber2:
+            _phoneForApiFromText(_proRef2PhoneController.text),
+        refDetails2: _proRef2DetailsController.text.trim(),
+      );
       _applyProfileDetails(
         updated,
-        name: _saved.name,
+        name: mergedUser.name,
         email: _saved.email,
+        user: mergedUser,
       );
       ref.read(registerLocationProvider.notifier).clear();
       _seedLocationFromProfile(updated);
+      refreshShellUserHeader(ref);
       setState(() => _editing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -584,6 +842,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           _userHeaderCard(context),
           const SizedBox(height: 16),
+          _personalDetailsCard(context),
+          const SizedBox(height: 16),
           _professionalCard(context),
           const SizedBox(height: 16),
           _professionalReferencesCard(context),
@@ -687,44 +947,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Text(
-              _saved.name.isEmpty ? '—' : _saved.name,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.3,
-              ),
+          _editing
+              ? _editableField(
+                  controller: _nameController,
+                  hint: 'Full name',
+                )
+              : Text(
+                  _saved.name.isEmpty ? '—' : _saved.name,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+          const SizedBox(height: 12),
+          _fieldLabel('Email'),
+          InputDecorator(
+            decoration: _inputDecoration().copyWith(
+              filled: true,
+              fillColor: Colors.grey.shade100,
             ),
-          if (_saved.email.isNotEmpty && !_editing) ...[
-            const SizedBox(height: 6),
-            Text(
-              _saved.email,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+            child: Text(
+              _saved.email.isEmpty ? '—' : _saved.email,
+              style: TextStyle(fontSize: 15, color: Colors.grey.shade700),
             ),
-          ],
+          ),
           const SizedBox(height: 16),
           _headerContactRow(
             icon: Icons.phone_outlined,
             child: _editing
-                ? TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(fontSize: 15),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: 'Phone number',
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                    ),
-                  )
+                ? _ProfileUkPhoneField(controller: _phoneController)
                 : Text(
                     _saved.phone.isEmpty ? '—' : _saved.phone,
                     style: TextStyle(
@@ -898,8 +1150,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             (e) => DropdownMenuItem(value: e, child: Text(e)),
                           )
                           .toList(),
-                      onChanged: (v) =>
-                          setState(() => _locumRole = v ?? _locumRole),
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setState(() {
+                          _locumRole = v;
+                          if (v != 'Pharmacist') {
+                            _independentPrescriber = null;
+                          }
+                        });
+                      },
                     ),
                   ),
                 )
@@ -925,6 +1184,82 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 )
               : _readOnlyValue(_saved.gphcNumber),
+          const SizedBox(height: 16),
+          _fieldLabel('Qualification date'),
+          _editing
+              ? _dateField(_qualificationDateController)
+              : _readOnlyValue(_saved.qualificationDate),
+          if (_isPharmacistRole) ...[
+            const SizedBox(height: 16),
+            _fieldLabel('Independent prescriber'),
+            _editing
+                ? _ProfileIndependentPrescriberField(
+                    value: _independentPrescriber,
+                    onChanged: (v) =>
+                        setState(() => _independentPrescriber = v),
+                  )
+                : _readOnlyValue(_saved.independentPrescriber),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _personalDetailsCard(BuildContext context) {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle(Icons.badge_outlined, 'Personal details'),
+          const SizedBox(height: 16),
+          _fieldLabel('Address'),
+          _editing
+              ? _editableField(
+                  controller: _addressController,
+                  hint: 'Street address',
+                )
+              : _readOnlyValue(_saved.address),
+          const SizedBox(height: 16),
+          _fieldLabel('City'),
+          _editing
+              ? _editableField(controller: _cityController, hint: 'City')
+              : _readOnlyValue(_saved.city),
+          const SizedBox(height: 16),
+          _fieldLabel('Zip code'),
+          _editing
+              ? _editableField(
+                  controller: _zipCodeController,
+                  hint: 'Postcode',
+                )
+              : _readOnlyValue(_saved.zipCode),
+          const SizedBox(height: 16),
+          _fieldLabel('Date of birth'),
+          _editing
+              ? _dateField(_dobController)
+              : _readOnlyValue(_saved.dateOfBirth),
+          const SizedBox(height: 16),
+          _fieldLabel('Gender'),
+          _editing
+              ? InputDecorator(
+                  decoration: _inputDecoration(),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _gender,
+                      isExpanded: true,
+                      hint: const Text('Select gender'),
+                      items: _genderOptions
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e,
+                              child: Text(e),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => _gender = v),
+                    ),
+                  ),
+                )
+              : _readOnlyValue(_saved.gender),
         ],
       ),
     );
@@ -947,13 +1282,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 12),
           _fieldLabel('Name'),
-          _readOnlyValue(_saved.refName1),
+          _editing
+              ? _editableField(controller: _proRef1NameController)
+              : _readOnlyValue(_saved.refName1),
           const SizedBox(height: 12),
           _fieldLabel('Phone number'),
-          _readOnlyValue(_saved.refPhone1),
+          _editing
+              ? _ProfileUkPhoneField(controller: _proRef1PhoneController)
+              : _readOnlyValue(_saved.refPhone1),
           const SizedBox(height: 12),
           _fieldLabel('Details'),
-          _readOnlyValue(_saved.refDetails1, maxLines: 4),
+          _editing
+              ? _editableField(
+                  controller: _proRef1DetailsController,
+                  maxLines: 3,
+                )
+              : _readOnlyValue(_saved.refDetails1, maxLines: 4),
           const SizedBox(height: 24),
           Text(
             'Professional Reference 2',
@@ -965,13 +1309,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 12),
           _fieldLabel('Name'),
-          _readOnlyValue(_saved.refName2),
+          _editing
+              ? _editableField(controller: _proRef2NameController)
+              : _readOnlyValue(_saved.refName2),
           const SizedBox(height: 12),
           _fieldLabel('Phone number'),
-          _readOnlyValue(_saved.refPhone2),
+          _editing
+              ? _ProfileUkPhoneField(controller: _proRef2PhoneController)
+              : _readOnlyValue(_saved.refPhone2),
           const SizedBox(height: 12),
           _fieldLabel('Details'),
-          _readOnlyValue(_saved.refDetails2, maxLines: 4),
+          _editing
+              ? _editableField(
+                  controller: _proRef2DetailsController,
+                  maxLines: 3,
+                )
+              : _readOnlyValue(_saved.refDetails2, maxLines: 4),
         ],
       ),
     );
@@ -1021,7 +1374,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
           const SizedBox(height: 16),
           Text(
-            'TRAVEL DISTANCE (KM)',
+            'TRAVEL DISTANCE (MILES)',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -1043,7 +1396,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 )
               : Text(
-                  _saved.travelKm.isEmpty ? '—' : _saved.travelKm,
+                  _saved.travelMiles.isEmpty ? '—' : _saved.travelMiles,
                   style: const TextStyle(fontSize: 15),
                 ),
         ],
@@ -1063,7 +1416,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Tap images to preview; other files open externally',
+            _editing
+                ? 'Documents cannot be changed here. Tap to preview only.'
+                : 'Tap images to preview; other files open externally',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 12),
@@ -1181,6 +1536,105 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProfileUkPhoneField extends StatelessWidget {
+  const _ProfileUkPhoneField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE0E0E0)),
+          ),
+          child: const Text(
+            '+44',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            decoration: InputDecoration(
+              hintText: 'Enter phone number',
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileIndependentPrescriberField extends StatelessWidget {
+  const _ProfileIndependentPrescriberField({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final bool? value;
+  final ValueChanged<bool?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget option(String label, bool selected, VoidCallback onTap) {
+      return Expanded(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFE0E0E0)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.check_box
+                      : Icons.check_box_outline_blank,
+                  size: 20,
+                  color: selected ? BrandColors.primaryBlue : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Text(label),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        option('Yes', value == true, () => onChanged(true)),
+        const SizedBox(width: 12),
+        option('No', value == false, () => onChanged(false)),
+      ],
     );
   }
 }

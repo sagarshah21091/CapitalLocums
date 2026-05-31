@@ -24,7 +24,9 @@ class ProfileRepository {
     return response.data!;
   }
 
-  Future<ProfileUpdateResponse> updateProfile(ProfileDetails body) async {
+  Future<ProfileUpdateResponse> updateProfile(
+    Map<String, dynamic> body,
+  ) async {
     late final ProfileUpdateResponse response;
     try {
       response = await _api.updateProfile(body);

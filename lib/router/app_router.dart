@@ -182,6 +182,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
           final isBooked = state.uri.queryParameters['is_booked'] == '1';
           return ShiftDetailScreen(
+            key: ValueKey<int>(id),
             shiftId: id,
             initialIsBooked: isBooked,
           );

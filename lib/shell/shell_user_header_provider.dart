@@ -1,7 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../auth/auth_session.dart';
 import '../profile/profile_providers.dart';
 import '../profile/profile_repository.dart';
+
+/// Clears cached shell header (call after login, logout, or profile save).
+void refreshShellUserHeader(WidgetRef ref) {
+  ref.invalidate(shellUserHeaderProvider);
+}
 
 /// Name and locum role shown in the main shell app bar.
 class ShellUserHeader {
@@ -23,7 +29,14 @@ String _formatLocumRole(String? apiRole) {
   return r[0].toUpperCase() + r.substring(1);
 }
 
-final shellUserHeaderProvider = FutureProvider<ShellUserHeader>((ref) async {
+/// Refetches when [authSessionProvider] changes (login / logout).
+final shellUserHeaderProvider =
+    FutureProvider.autoDispose<ShellUserHeader>((ref) async {
+  final authStatus = ref.watch(authSessionProvider);
+  if (authStatus != AuthSessionStatus.authenticated) {
+    return const ShellUserHeader(name: '', yourRole: '');
+  }
+
   try {
     final payload = await ref.read(profileRepositoryProvider).fetchProfile();
     return ShellUserHeader(

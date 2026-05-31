@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../app_version.dart';
 import '../auth/auth_session.dart';
 import '../router/app_router.dart';
+import '../shell/shell_user_header_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -59,6 +60,7 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (confirm != true || !context.mounted) return;
     await ref.read(authSessionProvider.notifier).logout();
+    refreshShellUserHeader(ref);
     if (!context.mounted) return;
     context.go(AppRoute.login);
   }

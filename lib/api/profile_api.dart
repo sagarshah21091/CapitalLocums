@@ -32,11 +32,13 @@ class ProfileApi {
   }
 
   /// PUT `/profile` (requires Bearer token).
-  Future<ProfileUpdateResponse> updateProfile(ProfileDetails body) async {
+  Future<ProfileUpdateResponse> updateProfile(
+    Map<String, dynamic> body,
+  ) async {
     try {
       final response = await _dio.put<Map<String, dynamic>>(
         '/profile',
-        data: body.toJson(),
+        data: body,
         options: Options(
           contentType: Headers.jsonContentType,
         ),

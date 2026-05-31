@@ -39,7 +39,13 @@ class ShiftsRepository {
             : 'Could not load shift details.',
       );
     }
-    return response.shift!;
+    final shift = response.shift!;
+    if (shift.id != shiftId) {
+      throw ShiftsFailure(
+        'Shift data mismatch (expected id $shiftId, received ${shift.id}).',
+      );
+    }
+    return shift;
   }
 }
 

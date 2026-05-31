@@ -1,3 +1,38 @@
+String _shiftJsonString(dynamic value) {
+  if (value == null) return '';
+  if (value is String) return value;
+  if (value is num) return value.toString();
+  return value.toString();
+}
+
+int _shiftJsonInt(dynamic value, {int fallback = 0}) {
+  if (value == null) return fallback;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value.trim()) ?? fallback;
+  return fallback;
+}
+
+num? _shiftJsonNumNullable(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value;
+  if (value is String) return num.tryParse(value.trim());
+  return null;
+}
+
+Map<String, dynamic>? _extractShiftPayload(Map<String, dynamic> json) {
+  final shift = json['shift'];
+  if (shift is Map<String, dynamic>) return shift;
+
+  final data = json['data'];
+  if (data is Map<String, dynamic>) {
+    final nested = data['shift'];
+    if (nested is Map<String, dynamic>) return nested;
+    if (data['id'] != null) return data;
+  }
+  return null;
+}
+
 class ShiftsListResponse {
   const ShiftsListResponse({
     required this.success,
@@ -148,11 +183,13 @@ class ShiftDetailResponse {
   final String? message;
 
   factory ShiftDetailResponse.fromJson(Map<String, dynamic> json) {
-    final raw = json['shift'];
+    final raw = _extractShiftPayload(json);
     return ShiftDetailResponse(
       success: json['success'] as bool? ?? false,
-      shift: raw is Map<String, dynamic> ? ShiftDetail.fromJson(raw) : null,
-      message: json['message'] as String?,
+      shift: raw != null ? ShiftDetail.fromJson(raw) : null,
+      message: _shiftJsonString(json['message']).isEmpty
+          ? null
+          : _shiftJsonString(json['message']),
     );
   }
 }
@@ -174,6 +211,14 @@ class ShiftDetail {
     required this.status,
     required this.summary,
     required this.locumRole,
+    this.lunchBreakMinutes,
+    this.pharmacyName,
+    this.contactPerson,
+    this.phoneNumber,
+    this.pharmacyAddress,
+    this.pharmacyLocation,
+    this.licenseNumber,
+    this.distanceMiles,
     this.createdAt,
     this.updatedAt,
   });
@@ -193,29 +238,125 @@ class ShiftDetail {
   final String status;
   final String summary;
   final String locumRole;
+  final int? lunchBreakMinutes;
+  final String? pharmacyName;
+  final String? contactPerson;
+  final String? phoneNumber;
+  final String? pharmacyAddress;
+  final String? pharmacyLocation;
+  final String? licenseNumber;
+  final num? distanceMiles;
   final String? createdAt;
   final String? updatedAt;
 
   factory ShiftDetail.fromJson(Map<String, dynamic> json) {
+    final pharmacy = json['pharmacy'];
+    final pharmacyMap =
+        pharmacy is Map<String, dynamic> ? pharmacy : null;
+
+    String field(String snake, [String? camel, String? nestedKey]) {
+      final top = _shiftJsonString(json[snake] ?? json[camel]);
+      if (top.isNotEmpty) return top;
+      if (pharmacyMap == null) return '';
+      final fromPharmacy = _shiftJsonString(
+        pharmacyMap[snake] ??
+            pharmacyMap[camel] ??
+            (nestedKey != null ? pharmacyMap[nestedKey] : null),
+      );
+      return fromPharmacy;
+    }
+
+    String? optionalField(String snake, [String? camel, String? nestedKey]) {
+      final v = field(snake, camel, nestedKey);
+      return v.isEmpty ? null : v;
+    }
+
+    final dateRaw = _shiftJsonString(json['date']);
     return ShiftDetail(
-      id: (json['id'] as num).toInt(),
-      pharmacyId: (json['pharmacy_id'] as num?)?.toInt() ?? 0,
-      date: DateTime.parse(json['date'] as String).toLocal(),
-      startTime: json['start_time'] as String? ?? '',
-      endTime: json['end_time'] as String? ?? '',
-      location: json['location'] as String? ?? '',
-      address: json['address'] as String? ?? '',
-      latitude: json['latitude'] as String? ?? '',
-      longitude: json['longitude'] as String? ?? '',
-      payRate: json['pay_rate'] as String? ?? '',
-      requiredLocums: (json['required_locums'] as num?)?.toInt() ?? 0,
-      bookedLocumsCount: (json['booked_locums_count'] as num?)?.toInt() ?? 0,
-      status: (json['status'] as String? ?? '').toLowerCase(),
-      summary: json['summary'] as String? ?? '',
-      locumRole: json['locum_role'] as String? ?? '',
-      createdAt: json['created_at'] as String?,
-      updatedAt: json['updated_at'] as String?,
+      id: _shiftJsonInt(json['id']),
+      pharmacyId: _shiftJsonInt(json['pharmacy_id']),
+      date: dateRaw.isNotEmpty
+          ? DateTime.parse(dateRaw).toLocal()
+          : DateTime.now(),
+      startTime: _shiftJsonString(json['start_time'] ?? json['startTime']),
+      endTime: _shiftJsonString(json['end_time'] ?? json['endTime']),
+      location: _shiftJsonString(json['location']),
+      address: _shiftJsonString(json['address']),
+      latitude: _shiftJsonString(json['latitude']),
+      longitude: _shiftJsonString(json['longitude']),
+      payRate: _shiftJsonString(json['pay_rate'] ?? json['payRate']),
+      requiredLocums: _shiftJsonInt(json['required_locums']),
+      bookedLocumsCount: _shiftJsonInt(json['booked_locums_count']),
+      status: _shiftJsonString(json['status']).toLowerCase(),
+      summary: _shiftJsonString(json['summary']),
+      locumRole: _shiftJsonString(json['locum_role'] ?? json['locumRole']),
+      lunchBreakMinutes: _shiftJsonNumNullable(json['lunch_break_minutes'])
+          ?.toInt(),
+      pharmacyName: optionalField('pharmacy_name', 'pharmacyName', 'name'),
+      contactPerson:
+          optionalField('contact_person', 'contactPerson', 'contact_person'),
+      phoneNumber: optionalField('phone_number', 'phoneNumber', 'phone'),
+      pharmacyAddress:
+          optionalField('pharmacy_address', 'pharmacyAddress', 'address'),
+      pharmacyLocation:
+          optionalField('pharmacy_location', 'pharmacyLocation'),
+      licenseNumber:
+          optionalField('license_number', 'licenseNumber', 'license_number'),
+      distanceMiles: _shiftJsonNumNullable(
+        json['distance_miles'] ?? json['distanceMiles'],
+      ),
+      createdAt: _shiftJsonString(json['created_at']).isEmpty
+          ? null
+          : _shiftJsonString(json['created_at']),
+      updatedAt: _shiftJsonString(json['updated_at']).isEmpty
+          ? null
+          : _shiftJsonString(json['updated_at']),
     );
+  }
+
+  /// Non-empty API text or em dash.
+  static String displayText(String value) {
+    final v = value.trim();
+    return v.isEmpty ? '—' : v;
+  }
+
+  /// API `start_time` and `end_time` as HH:mm (e.g. 15:12 - 19:12).
+  String get formattedDisplayTimeRange {
+    final start = _trimTimeToHm(startTime);
+    final end = _trimTimeToHm(endTime);
+    if (start.isEmpty && end.isEmpty) return '—';
+    if (start.isEmpty) return end;
+    if (end.isEmpty) return start;
+    return '$start - $end';
+  }
+
+  static String _trimTimeToHm(String t) {
+    final parts = t.trim().split(':');
+    if (parts.length >= 2) return '${parts[0]}:${parts[1]}';
+    return t.trim();
+  }
+
+  /// API `start_time` and `end_time` joined exactly as returned.
+  String get apiTimeRange {
+    if (startTime.isEmpty && endTime.isEmpty) return '—';
+    if (startTime.isEmpty) return endTime;
+    if (endTime.isEmpty) return startTime;
+    return '$startTime - $endTime';
+  }
+
+  /// Header distance line from API `distance_miles`.
+  String? get apiDistanceLabel {
+    final miles = distanceMiles;
+    if (miles == null) return null;
+    if (miles == 0) return 'Same location';
+    return '$miles miles away';
+  }
+
+  /// API `lunch_break_minutes` (e.g. 10 minutes, 32 minutes).
+  String get apiLunchBreakText {
+    final mins = lunchBreakMinutes;
+    if (mins == null) return '—';
+    return mins == 1 ? '1 minute' : '$mins minutes';
   }
 
   String get displayRole {
@@ -233,7 +374,10 @@ class ShiftDetail {
     return r[0].toUpperCase() + r.substring(1);
   }
 
-  String get statusLabel => status.trim().toUpperCase();
+  String get statusLabel {
+    if (status == 'open') return 'AVAILABLE';
+    return status.trim().toUpperCase();
+  }
 
   bool get isOpen => status == 'open';
 
@@ -265,18 +409,26 @@ class ShiftDetail {
     return '${weekdays[d.weekday - 1]} ${d.day} ${months[d.month - 1]}';
   }
 
-  String get formattedTimeRange {
-    String format(String t) {
-      final parts = t.split(':');
-      if (parts.length >= 3) {
-        return '${parts[0]}:${parts[1]}:${parts[2]}';
-      }
-      if (parts.length >= 2) return '${parts[0]}:${parts[1]}:00';
-      return t;
-    }
+  String get formattedTimeRange => formattedDisplayTimeRange;
 
-    return '${format(startTime)} - ${format(endTime)}';
+  String get formattedCalendarDate {
+    final d = date.toLocal();
+    final day = d.day.toString().padLeft(2, '0');
+    final month = d.month.toString().padLeft(2, '0');
+    return '$day/$month/${d.year}';
   }
 
-  String get formattedPayRate => '$payRate / hour';
+  String get formattedPayRate {
+    final rate = payRate.trim();
+    if (rate.isEmpty) return '—';
+    final parsed = double.tryParse(rate);
+    final display = parsed != null ? parsed.toStringAsFixed(2) : rate;
+    return '£$display /hour';
+  }
+
+  String get displayPharmacyName => displayText(pharmacyName ?? '');
+  String get displayContactPerson => displayText(contactPerson ?? '');
+  String get displayPhoneNumber => displayText(phoneNumber ?? '');
+  String get displayPharmacyAddress => displayText(pharmacyAddress ?? '');
+  String get displayLicenseNumber => displayText(licenseNumber ?? '');
 }

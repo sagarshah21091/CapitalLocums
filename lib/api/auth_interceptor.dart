@@ -1,4 +1,7 @@
+import 'dart:developer' as developer;
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../auth/token_storage.dart';
 
@@ -11,7 +14,14 @@ class AuthInterceptor extends Interceptor {
   ) async {
     final token = await TokenStorage.readToken();
     if (token != null && token.trim().isNotEmpty) {
-      options.headers['Authorization'] = 'Bearer ${token.trim()}';
+      final trimmed = token.trim();
+      options.headers['Authorization'] = 'Bearer $trimmed';
+      if (kDebugMode) {
+        developer.log(
+          'Authorization: Bearer $trimmed',
+          name: 'CapitalLocums.Auth',
+        );
+      }
     }
     handler.next(options);
   }

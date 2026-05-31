@@ -1,3 +1,7 @@
+import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart';
+
 import '../api/api_constants.dart';
 import '../api/auth_api.dart';
 import '../api/models/forgot_password_models.dart';
@@ -48,6 +52,12 @@ class AuthRepository {
       await TokenStorage.saveToken(response.token!);
     } on TokenSaveException catch (e) {
       throw AuthFailure(e.message);
+    }
+    if (kDebugMode) {
+      developer.log(
+        'Login token: ${response.token!}',
+        name: 'CapitalLocums.Auth',
+      );
     }
     return user;
   }
