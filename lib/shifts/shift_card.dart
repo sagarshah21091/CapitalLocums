@@ -44,14 +44,37 @@ class ShiftCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
-                    shift.location,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: _titleNavy,
-                      height: 1.25,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (shift.pharmacyName.trim().isNotEmpty) ...[
+                        Text(
+                          shift.pharmacyName.trim(),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: _titleNavy,
+                            height: 1.25,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      Text(
+                        shift.location,
+                        style: TextStyle(
+                          fontSize: shift.pharmacyName.trim().isNotEmpty
+                              ? 14
+                              : 16,
+                          fontWeight: shift.pharmacyName.trim().isNotEmpty
+                              ? FontWeight.w500
+                              : FontWeight.w800,
+                          color: shift.pharmacyName.trim().isNotEmpty
+                              ? Colors.grey.shade700
+                              : _titleNavy,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),

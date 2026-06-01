@@ -103,6 +103,57 @@ class BookingListCard extends StatelessWidget {
               _BookingStatusBadge(label: _statusLabel, color: _accent),
             ],
           ),
+          if (booking.displayPharmacyName.isNotEmpty ||
+              booking.location.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            if (booking.displayPharmacyName.isNotEmpty)
+              Text(
+                booking.displayPharmacyName,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: _titleNavy,
+                  height: 1.25,
+                ),
+              ),
+            if (booking.displayPharmacyName.isNotEmpty &&
+                booking.location.trim().isNotEmpty)
+              const SizedBox(height: 4),
+            if (booking.location.trim().isNotEmpty)
+              Text(
+                booking.location,
+                style: TextStyle(
+                  fontSize: booking.displayPharmacyName.isNotEmpty ? 13 : 15,
+                  fontWeight: booking.displayPharmacyName.isNotEmpty
+                      ? FontWeight.w500
+                      : FontWeight.w700,
+                  color: booking.displayPharmacyName.isNotEmpty
+                      ? Colors.grey.shade700
+                      : _titleNavy,
+                  height: 1.25,
+                ),
+              ),
+          ],
+          if (booking.formattedTravelDistance != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.directions_car_outlined,
+                  size: 17,
+                  color: Colors.grey.shade600,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  booking.formattedTravelDistance!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
@@ -111,29 +162,6 @@ class BookingListCard extends StatelessWidget {
               Text(
                 booking.formattedTimeRange,
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-              ),
-              const Spacer(),
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.location_on_outlined,
-                        size: 18, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        booking.location,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade800,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
           ),

@@ -33,3 +33,4 @@ final shiftsFilterOpenTriggerProvider =
     NotifierProvider<ShiftsFilterOpenTrigger, int>(
   ShiftsFilterOpenTrigger.new,
 );
+

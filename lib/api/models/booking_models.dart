@@ -41,6 +41,20 @@ class MyBookingsResponse {
   }
 }
 
+String _bookingJsonString(dynamic value) {
+  if (value == null) return '';
+  if (value is String) return value;
+  if (value is num) return value.toString();
+  return value.toString();
+}
+
+num? _bookingJsonNumNullable(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value;
+  if (value is String) return num.tryParse(value.trim());
+  return null;
+}
+
 class LocumBooking {
   const LocumBooking({
     required this.bookingId,
@@ -53,6 +67,8 @@ class LocumBooking {
     required this.location,
     required this.payRate,
     required this.locumRole,
+    this.pharmacyName,
+    this.travelDistance,
   });
 
   final int bookingId;
@@ -65,6 +81,8 @@ class LocumBooking {
   final String location;
   final String payRate;
   final String locumRole;
+  final String? pharmacyName;
+  final num? travelDistance;
 
   factory LocumBooking.fromJson(Map<String, dynamic> json) {
     return LocumBooking(
@@ -78,6 +96,10 @@ class LocumBooking {
       location: json['location'] as String? ?? '',
       payRate: json['pay_rate'] as String? ?? '',
       locumRole: json['locum_role'] as String? ?? '',
+      pharmacyName: _bookingJsonString(json['pharmacy_name']).isEmpty
+          ? null
+          : _bookingJsonString(json['pharmacy_name']),
+      travelDistance: _bookingJsonNumNullable(json['travel_distance']),
     );
   }
 
@@ -130,5 +152,18 @@ class LocumBooking {
     if (r == 'dispenser') return 'Dispenser';
     if (r == 'technician') return 'Technician';
     return r[0].toUpperCase() + r.substring(1);
+  }
+
+  String get displayPharmacyName {
+    final name = pharmacyName?.trim() ?? '';
+    return name.isEmpty ? '' : name;
+  }
+
+  /// API `travel_distance` (miles).
+  String? get formattedTravelDistance {
+    final miles = travelDistance;
+    if (miles == null) return null;
+    if (miles == 0) return 'Same location';
+    return '$miles miles';
   }
 }

@@ -14,7 +14,7 @@ import 'shifts_filter_sheet.dart';
 import 'shifts_providers.dart';
 import 'shifts_repository.dart';
 
-/// Find Shifts tab — GET `/shifts` with location, date, and min pay filters.
+/// Find Shifts tab — GET `/shifts` with filters in bottom sheet (AppBar icon).
 class FindShiftsScreen extends ConsumerStatefulWidget {
   const FindShiftsScreen({super.key});
 
@@ -106,8 +106,11 @@ class _FindShiftsScreenState extends ConsumerState<FindShiftsScreen> {
       location: _filters.location,
       latitude: _filters.latitude,
       longitude: _filters.longitude,
-      date: _filters.apiDate,
-      payRate: _filters.minPay,
+      dateFrom: _filters.apiDateFrom,
+      dateTo: _filters.apiDateTo,
+      minPayRate: _filters.minPay,
+      maxPayRate: _filters.maxPay,
+      locumRole: _filters.apiLocumRole,
       page: page,
       limit: _pageLimit,
     );

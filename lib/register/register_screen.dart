@@ -54,12 +54,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _yourRole = 'Pharmacist';
   String? _gender;
   bool? _independentPrescriber;
-  bool _agreedPharmacistTc = false;
+  bool _agreedRoleTc = false;
   bool _agreedPrivacyPolicy = false;
 
   static const _genderOptions = ['Male', 'Female', 'Other'];
   static const _pharmacistTcUrl =
       'https://www.capitallocums.co.uk/pharmacisttandcs';
+  static const _dispenserTechnicianTcUrl =
+      'https://www.capitallocums.co.uk/dispenser-technician-tcs';
   static const _privacyPolicyUrl =
       'https://www.capitallocums.co.uk/privacy-policy';
 
@@ -78,6 +80,38 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   static const _labelColor = Color(0xFF424242);
 
   static const _yourRoleOptions = ['Pharmacist', 'Technician', 'Dispenser'];
+
+  static _RoleTermsConfig _termsConfigForRole(String role) {
+    switch (role) {
+      case 'Technician':
+        return const _RoleTermsConfig(
+          sectionTitle: 'Technician T&Cs',
+          termsLinkLabel: 'Capital Locum technician terms and conditions',
+          checkboxLinkLabel: 'Technician T&Cs',
+          termsUrl: _dispenserTechnicianTcUrl,
+          validationMessage:
+              'Please agree to the Technician T&Cs and Privacy Policy',
+        );
+      case 'Dispenser':
+        return const _RoleTermsConfig(
+          sectionTitle: 'Dispenser T&Cs',
+          termsLinkLabel: 'Capital Locum dispenser terms and conditions',
+          checkboxLinkLabel: 'Dispenser T&Cs',
+          termsUrl: _dispenserTechnicianTcUrl,
+          validationMessage:
+              'Please agree to the Dispenser T&Cs and Privacy Policy',
+        );
+      default:
+        return const _RoleTermsConfig(
+          sectionTitle: 'Pharmacist T&Cs',
+          termsLinkLabel: 'Capital Locum pharmacist terms and conditions',
+          checkboxLinkLabel: 'Pharmacist T&Cs',
+          termsUrl: _pharmacistTcUrl,
+          validationMessage:
+              'Please agree to the Pharmacist T&Cs and Privacy Policy',
+        );
+    }
+  }
 
   static List<({int index, String label, bool isRequired})> _documentEntries(
     bool isPharmacist,
@@ -458,8 +492,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   String? _validateTermsAgreements() {
-    if (!_agreedPharmacistTc || !_agreedPrivacyPolicy) {
-      return 'Please agree to the Pharmacist T&Cs and Privacy Policy';
+    if (!_agreedRoleTc || !_agreedPrivacyPolicy) {
+      return _termsConfigForRole(_yourRole).validationMessage;
     }
     return null;
   }
@@ -503,7 +537,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             independentPrescriber: _isPharmacist
                 ? (_independentPrescriber! ? '1' : '0')
                 : null,
-            agreedPharmacistTerms: _agreedPharmacistTc,
+            agreedPharmacistTerms: _agreedRoleTc,
             agreedPrivacyPolicy: _agreedPrivacyPolicy,
             passport: docs[RegisterDocSlot.passport]!,
             nationalInsurance: docs[RegisterDocSlot.nationalInsurance]!,
@@ -737,6 +771,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 if (v == null) return;
                                 setState(() {
                                   _yourRole = v;
+                                  _agreedRoleTc = false;
                                   if (v != 'Pharmacist') {
                                     _independentPrescriber = null;
                                     ref
@@ -998,11 +1033,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _PharmacistTermsSection(
-                            agreedPharmacistTc: _agreedPharmacistTc,
+                          _RoleTermsSection(
+                            key: ValueKey(_yourRole),
+                            config: _termsConfigForRole(_yourRole),
+                            agreedRoleTc: _agreedRoleTc,
                             agreedPrivacyPolicy: _agreedPrivacyPolicy,
-                            onPharmacistTcChanged: (v) {
-                              setState(() => _agreedPharmacistTc = v);
+                            onRoleTcChanged: (v) {
+                              setState(() => _agreedRoleTc = v);
                               field.didChange(null);
                             },
                             onPrivacyPolicyChanged: (v) {
@@ -1010,7 +1047,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               field.didChange(null);
                             },
                             onOpenUrl: _openExternalUrl,
-                            pharmacistTcUrl: _pharmacistTcUrl,
                             privacyPolicyUrl: _privacyPolicyUrl,
                             hasError: field.hasError,
                           ),
@@ -1227,24 +1263,41 @@ class _IndependentPrescriberField extends StatelessWidget {
   }
 }
 
-class _PharmacistTermsSection extends StatelessWidget {
-  const _PharmacistTermsSection({
-    required this.agreedPharmacistTc,
+class _RoleTermsConfig {
+  const _RoleTermsConfig({
+    required this.sectionTitle,
+    required this.termsLinkLabel,
+    required this.checkboxLinkLabel,
+    required this.termsUrl,
+    required this.validationMessage,
+  });
+
+  final String sectionTitle;
+  final String termsLinkLabel;
+  final String checkboxLinkLabel;
+  final String termsUrl;
+  final String validationMessage;
+}
+
+class _RoleTermsSection extends StatelessWidget {
+  const _RoleTermsSection({
+    super.key,
+    required this.config,
+    required this.agreedRoleTc,
     required this.agreedPrivacyPolicy,
-    required this.onPharmacistTcChanged,
+    required this.onRoleTcChanged,
     required this.onPrivacyPolicyChanged,
     required this.onOpenUrl,
-    required this.pharmacistTcUrl,
     required this.privacyPolicyUrl,
     this.hasError = false,
   });
 
-  final bool agreedPharmacistTc;
+  final _RoleTermsConfig config;
+  final bool agreedRoleTc;
   final bool agreedPrivacyPolicy;
-  final ValueChanged<bool> onPharmacistTcChanged;
+  final ValueChanged<bool> onRoleTcChanged;
   final ValueChanged<bool> onPrivacyPolicyChanged;
   final Future<void> Function(String url) onOpenUrl;
-  final String pharmacistTcUrl;
   final String privacyPolicyUrl;
   final bool hasError;
 
@@ -1311,9 +1364,9 @@ class _PharmacistTermsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Pharmacist T&Cs',
-            style: TextStyle(
+          Text(
+            config.sectionTitle,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: Color(0xFF424242),
@@ -1329,7 +1382,7 @@ class _PharmacistTermsSection extends StatelessWidget {
                 'Please check each box to confirm that you have read and agree to the ',
                 style: TextStyle(fontSize: 13, color: Color(0xFF424242)),
               ),
-              _linkText('Capital Locum pharmacist terms and conditions', pharmacistTcUrl),
+              _linkText(config.termsLinkLabel, config.termsUrl),
               const Text(
                 ' and ',
                 style: TextStyle(fontSize: 13, color: Color(0xFF424242)),
@@ -1348,8 +1401,8 @@ class _PharmacistTermsSection extends StatelessWidget {
               children: [
                 Expanded(
                   child: _agreementBox(
-                    value: agreedPharmacistTc,
-                    onChanged: onPharmacistTcChanged,
+                    value: agreedRoleTc,
+                    onChanged: onRoleTcChanged,
                     label: Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
@@ -1357,7 +1410,7 @@ class _PharmacistTermsSection extends StatelessWidget {
                           'I agree to the ',
                           style: TextStyle(fontSize: 13),
                         ),
-                        _linkText('Pharmacist T&Cs', pharmacistTcUrl),
+                        _linkText(config.checkboxLinkLabel, config.termsUrl),
                         const Text('.', style: TextStyle(fontSize: 13)),
                       ],
                     ),
@@ -1385,13 +1438,13 @@ class _PharmacistTermsSection extends StatelessWidget {
             )
           else ...[
             _agreementBox(
-              value: agreedPharmacistTc,
-              onChanged: onPharmacistTcChanged,
+              value: agreedRoleTc,
+              onChanged: onRoleTcChanged,
               label: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Text('I agree to the ', style: TextStyle(fontSize: 13)),
-                  _linkText('Pharmacist T&Cs', pharmacistTcUrl),
+                  _linkText(config.checkboxLinkLabel, config.termsUrl),
                   const Text('.', style: TextStyle(fontSize: 13)),
                 ],
               ),

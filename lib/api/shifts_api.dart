@@ -12,8 +12,11 @@ class ShiftsQuery {
     this.location = '',
     this.latitude,
     this.longitude,
-    this.date = '',
-    this.payRate = '',
+    this.dateFrom = '',
+    this.dateTo = '',
+    this.minPayRate = '',
+    this.maxPayRate = '',
+    this.locumRole = '',
     this.page = 1,
     this.limit = 6,
   });
@@ -21,8 +24,11 @@ class ShiftsQuery {
   final String location;
   final double? latitude;
   final double? longitude;
-  final String date;
-  final String payRate;
+  final String dateFrom;
+  final String dateTo;
+  final String minPayRate;
+  final String maxPayRate;
+  final String locumRole;
   final int page;
   final int limit;
 
@@ -31,8 +37,11 @@ class ShiftsQuery {
       'location': location,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
-      'date': date,
-      'pay_rate': payRate,
+      if (dateFrom.isNotEmpty) 'date_from': dateFrom,
+      if (dateTo.isNotEmpty) 'date_to': dateTo,
+      if (minPayRate.isNotEmpty) 'min_pay_rate': minPayRate,
+      if (maxPayRate.isNotEmpty) 'max_pay_rate': maxPayRate,
+      if (locumRole.isNotEmpty) 'locum_role': locumRole,
       'page': page,
       'limit': limit,
     };

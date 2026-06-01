@@ -77,6 +77,7 @@ class ShiftListing {
     required this.location,
     required this.address,
     required this.payRate,
+    required this.pharmacyName,
     required this.requiredLocums,
     required this.bookedLocumsCount,
     required this.availableSlots,
@@ -93,6 +94,7 @@ class ShiftListing {
   final String location;
   final String address;
   final String payRate;
+  final String pharmacyName;
   final int requiredLocums;
   final int bookedLocumsCount;
   final int availableSlots;
@@ -110,6 +112,7 @@ class ShiftListing {
       location: json['location'] as String? ?? '',
       address: json['address'] as String? ?? '',
       payRate: json['pay_rate'] as String? ?? '',
+      pharmacyName: _shiftJsonString(json['pharmacy_name']),
       requiredLocums: (json['required_locums'] as num?)?.toInt() ?? 0,
       bookedLocumsCount: (json['booked_locums_count'] as num?)?.toInt() ?? 0,
       availableSlots: (json['available_slots'] as num?)?.toInt() ?? 0,
