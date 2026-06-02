@@ -14,6 +14,7 @@ import 'register_api_provider.dart';
 import 'register_documents_provider.dart';
 import 'register_location_autocomplete.dart';
 import 'register_location_provider.dart';
+import 'register_qualification_certs_provider.dart';
 
 enum _DocPickSource { camera, gallery, document }
 
@@ -126,11 +127,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       (
         index: RegisterDocSlot.nationalInsurance,
         label: 'National insurance',
-        isRequired: true,
-      ),
-      (
-        index: RegisterDocSlot.qualificationCert,
-        label: 'Qualification certificates',
         isRequired: true,
       ),
       if (isPharmacist)
@@ -467,6 +463,94 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     ref.read(registerDocumentsProvider.notifier).setFile(index, image);
   }
 
+  XFile? _xFileFromPlatformFile(PlatformFile p) {
+    final path = p.path;
+    if (path != null && path.trim().isNotEmpty) {
+      return XFile(path.trim(), name: p.name);
+    }
+    if (p.bytes != null && p.bytes!.isNotEmpty) {
+      return XFile.fromData(p.bytes!, name: p.name);
+    }
+    return null;
+  }
+
+  Future<void> _pickQualificationCert() async {
+    final notifier = ref.read(registerQualificationCertsProvider.notifier);
+    final remaining = RegisterQualificationCerts.maxCount -
+        ref.read(registerQualificationCertsProvider).length;
+    if (remaining <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You can attach up to 4 qualification certificates'),
+        ),
+      );
+      return;
+    }
+
+    final source = await _askDocPickSource();
+    if (!mounted || source == null) return;
+
+    if (source == _DocPickSource.document) {
+      FilePickerResult? result;
+      try {
+        result = await FilePicker.pickFiles(
+          allowMultiple: true,
+          type: FileType.any,
+        );
+      } on MissingPluginException {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'File picker isn’t linked yet. Stop the app completely (not hot '
+              'reload), then run: flutter clean && flutter pub get && flutter run. '
+              'On iOS also run: cd ios && pod install. Or use Camera / Gallery.',
+            ),
+          ),
+        );
+        return;
+      }
+      if (!mounted || result == null || result.files.isEmpty) return;
+
+      var added = 0;
+      for (final p in result.files) {
+        if (ref.read(registerQualificationCertsProvider).length >=
+            RegisterQualificationCerts.maxCount) {
+          break;
+        }
+        final file = _xFileFromPlatformFile(p);
+        if (file == null) continue;
+        if (notifier.add(file)) added++;
+      }
+      if (!mounted) return;
+      if (added == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not read that file. Try another.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    final XFile? image = await _imagePicker.pickImage(
+      source: source == _DocPickSource.camera
+          ? ImageSource.camera
+          : ImageSource.gallery,
+      imageQuality: 60,
+    );
+    if (!mounted || image == null) return;
+
+    if (!notifier.add(image) && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You can attach up to 4 qualification certificates'),
+        ),
+      );
+    }
+  }
+
   String? _validateExperience(String? value) {
     if (value == null || value.trim().isEmpty) return 'Required';
     final n = int.tryParse(value.trim());
@@ -487,6 +571,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (entry.isRequired && docs[entry.index] == null) {
         return 'Please attach: ${entry.label}';
       }
+    }
+    final qualCerts = ref.read(registerQualificationCertsProvider);
+    if (qualCerts.isEmpty) {
+      return 'Please attach at least one qualification certificate';
     }
     return null;
   }
@@ -510,6 +598,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     final docs = ref.read(registerDocumentsProvider);
+    final qualCerts = ref.read(registerQualificationCertsProvider);
     final picked = ref.read(registerLocationProvider);
 
     setState(() => _submitting = true);
@@ -526,7 +615,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             experienceYears: experience,
             locumRole: _locumRoleForApi(),
             travelDistanceMiles: travelMiles,
-            gphcNumber: _gphcController.text.trim(),
+            gphcNumber: _gphcController.text.trim().isEmpty
+                ? null
+                : _gphcController.text.trim(),
             address: _addressController.text,
             city: _cityController.text,
             zipCode: _zipCodeController.text,
@@ -541,7 +632,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             agreedPrivacyPolicy: _agreedPrivacyPolicy,
             passport: docs[RegisterDocSlot.passport]!,
             nationalInsurance: docs[RegisterDocSlot.nationalInsurance]!,
-            qualificationCert: docs[RegisterDocSlot.qualificationCert]!,
+            qualificationCertificates: qualCerts,
             professionalReference1Name: _proRef1NameController.text,
             professionalReference1Phone:
                 _phoneForApiFromText(_proRef1PhoneController.text),
@@ -556,6 +647,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
       if (!mounted) return;
       ref.read(registerDocumentsProvider.notifier).clearAll();
+      ref.read(registerQualificationCertsProvider.notifier).clearAll();
       ref.read(registerLocationProvider.notifier).clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -795,10 +887,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       children: [
                         _requiredLabel(
                           'GPhC number (7 digits)',
-                          isRequired: true,
+                          isRequired: _isPharmacist,
                           uppercase: false,
                         ),
                         TextFormField(
+                          key: ValueKey('gphc_$_yourRole'),
                           controller: _gphcController,
                           decoration: _decoration('1234567'),
                           keyboardType: TextInputType.number,
@@ -808,7 +901,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ],
                           validator: (v) {
                             final t = v?.trim() ?? '';
-                            if (t.isEmpty) return 'Required';
+                            if (t.isEmpty) {
+                              return _isPharmacist ? 'Required' : null;
+                            }
                             if (t.length != 7) {
                               return 'Enter exactly 7 digits';
                             }
@@ -991,6 +1086,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     key: ValueKey('documents_$_isPharmacist'),
                     validator: (_) => _validateDocuments(),
                     builder: (field) {
+                      final qualCerts = ref.watch(registerQualificationCertsProvider);
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -1005,6 +1101,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ref
                                   .read(registerDocumentsProvider.notifier)
                                   .setFile(index, null);
+                              field.didChange(null);
+                            },
+                            borderColor: _border,
+                            radius: _radius,
+                            hasError: field.hasError,
+                          ),
+                          const SizedBox(height: 16),
+                          _QualificationCertificatesCard(
+                            certs: qualCerts,
+                            onAdd: () async {
+                              await _pickQualificationCert();
+                              field.didChange(null);
+                            },
+                            onRemove: (index) {
+                              ref
+                                  .read(
+                                    registerQualificationCertsProvider.notifier,
+                                  )
+                                  .removeAt(index);
                               field.didChange(null);
                             },
                             borderColor: _border,
@@ -1688,6 +1803,109 @@ class _RegisterHeader extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+}
+
+class _QualificationCertificatesCard extends StatelessWidget {
+  const _QualificationCertificatesCard({
+    required this.certs,
+    required this.onAdd,
+    required this.onRemove,
+    required this.borderColor,
+    required this.radius,
+    this.hasError = false,
+  });
+
+  final List<XFile> certs;
+  final VoidCallback onAdd;
+  final void Function(int index) onRemove;
+  final Color borderColor;
+  final double radius;
+  final bool hasError;
+
+  @override
+  Widget build(BuildContext context) {
+    final canAdd = certs.length < RegisterQualificationCerts.maxCount;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasError ? Colors.red.shade700 : borderColor,
+          width: hasError ? 1.4 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RichText(
+            text: const TextSpan(
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF424242),
+              ),
+              children: [
+                TextSpan(text: 'Qualification certificates'),
+                TextSpan(
+                  text: ' *',
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Add up to ${RegisterQualificationCerts.maxCount} files. '
+            'At least 1 required.',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 16),
+          if (certs.isEmpty)
+            _DocUploadRow(
+              label: 'Certificate 1',
+              isRequired: true,
+              fileName: null,
+              onChoose: onAdd,
+              borderColor: borderColor,
+              radius: radius,
+            )
+          else ...[
+            for (var i = 0; i < certs.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              _DocUploadRow(
+                label: 'Certificate ${i + 1}',
+                isRequired: i == 0,
+                fileName: certs[i].name,
+                onChoose: onAdd,
+                onClear: () => onRemove(i),
+                borderColor: borderColor,
+                radius: radius,
+              ),
+            ],
+          ],
+          if (canAdd && certs.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(
+                  'Add certificate (${certs.length}/${RegisterQualificationCerts.maxCount})',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: BrandColors.primaryBlue,
+                  side: BorderSide(color: Colors.grey.shade400),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

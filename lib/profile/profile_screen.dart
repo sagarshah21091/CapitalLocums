@@ -212,6 +212,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool get _isPharmacistRole =>
       _editing ? _locumRole == 'Pharmacist' : _saved.isPharmacist;
 
+  /// Required for Pharmacist; optional for Technician/Dispenser. If set, must be 7 digits.
+  String? _gphcValidationMessage() {
+    final t = _gphcController.text.trim();
+    if (t.isEmpty) {
+      return _locumRole == 'Pharmacist' ? 'Required' : null;
+    }
+    if (t.length != 7) {
+      return 'Enter exactly 7 digits';
+    }
+    return null;
+  }
+
   InputDecoration _inputDecoration({String? hint}) {
     return InputDecoration(
       hintText: hint,
@@ -556,10 +568,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       return;
     }
 
-    final gphc = _gphcController.text.trim();
-    if (gphc.isEmpty || gphc.length != 7 || !RegExp(r'^\d{7}$').hasMatch(gphc)) {
+    final gphcError = _gphcValidationMessage();
+    if (gphcError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('GPhC number must be exactly 7 digits.')),
+        SnackBar(content: Text(gphcError)),
       );
       return;
     }
@@ -1039,16 +1051,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _fieldLabel(String text, {bool preserveCase = false}) {
+  Widget _fieldLabel(
+    String text, {
+    bool preserveCase = false,
+    bool isRequired = false,
+  }) {
+    final label = preserveCase ? text : text.toUpperCase();
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        preserveCase ? text : text.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: Colors.grey.shade700,
-          letterSpacing: preserveCase ? 0 : 0.4,
+      child: Text.rich(
+        TextSpan(
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+            letterSpacing: preserveCase ? 0 : 0.4,
+          ),
+          children: [
+            TextSpan(text: label),
+            if (isRequired)
+              const TextSpan(
+                text: ' *',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -1167,9 +1196,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   style: const TextStyle(fontSize: 15),
                 ),
           const SizedBox(height: 16),
-          _fieldLabel('GPhC number (7 digits)', preserveCase: true),
+          _fieldLabel(
+            'GPhC number (7 digits)',
+            preserveCase: true,
+            isRequired: _locumRole == 'Pharmacist',
+          ),
           _editing
               ? TextField(
+                  key: ValueKey('gphc_$_locumRole'),
                   controller: _gphcController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [

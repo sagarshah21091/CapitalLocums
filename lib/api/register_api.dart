@@ -26,7 +26,7 @@ class RegisterApi {
     required int experienceYears,
     required String locumRole,
     required double travelDistanceMiles,
-    required String gphcNumber,
+    String? gphcNumber,
     required String address,
     required String city,
     required String zipCode,
@@ -38,7 +38,7 @@ class RegisterApi {
     required bool agreedPrivacyPolicy,
     required XFile passport,
     required XFile nationalInsurance,
-    required XFile qualificationCert,
+    required List<XFile> qualificationCertificates,
     required String professionalReference1Name,
     required String professionalReference1Phone,
     required String professionalReference1Details,
@@ -66,7 +66,10 @@ class RegisterApi {
     addField('experience_years', '$experienceYears');
     addField('locum_role', locumRole.trim().toLowerCase());
     addField('travel_distance', '$travelDistanceMiles');
-    addField('gphc_number', gphcNumber.trim());
+    final gphc = gphcNumber?.trim() ?? '';
+    if (gphc.isNotEmpty) {
+      addField('gphc_number', gphc);
+    }
     addField('address', address.trim());
     addField('city', city.trim());
     addField('zip_code', zipCode.trim());
@@ -102,7 +105,9 @@ class RegisterApi {
         await addFile('visa_work_permit', visaWorkPermit);
       }
       await addFile('national_insurance', nationalInsurance);
-      await addFile('qualification_certificates', qualificationCert);
+      for (final cert in qualificationCertificates) {
+        await addFile('qualification_certificates', cert);
+      }
       if (dbsCheck != null) {
         await addFile('dbs_check', dbsCheck);
       }

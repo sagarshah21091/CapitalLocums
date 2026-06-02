@@ -8,10 +8,9 @@ abstract final class RegisterDocSlot {
   static const passport = 0;
   static const visaWorkPermit = 1;
   static const nationalInsurance = 2;
-  static const qualificationCert = 3;
-  static const dbsCheck = 4;
+  static const dbsCheck = 3;
 
-  static const count = 5;
+  static const count = 4;
 }
 
 /// Files chosen for locum uploads (multipart).
