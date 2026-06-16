@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_session.dart';
+import '../auth/session_expired.dart';
 import '../book/book_now_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../forgot_password_screen.dart';
@@ -12,6 +13,7 @@ import '../profile/profile_screen.dart';
 import '../register/register_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shell/main_shell_screen.dart';
+import '../shell/shell_user_header_provider.dart';
 import '../shifts/shift_detail_screen.dart';
 import '../splash_screen.dart';
 
@@ -76,7 +78,15 @@ String? _authRedirect(AuthSessionStatus status, String location) {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refreshListenable = ValueNotifier<int>(0);
-  ref.onDispose(refreshListenable.dispose);
+  ref.onDispose(() {
+    refreshListenable.dispose();
+    sessionExpiredLogoutCallback = null;
+  });
+
+  sessionExpiredLogoutCallback = () async {
+    await ref.read(authSessionProvider.notifier).logout();
+    ref.invalidate(shellUserHeaderProvider);
+  };
 
   ref.listen(authSessionProvider, (_, _) {
     refreshListenable.value++;

@@ -15,7 +15,8 @@ import 'profile_repository.dart';
 
 class _ProfileData {
   const _ProfileData({
-    required this.name,
+    required this.firstName,
+    required this.lastName,
     required this.email,
     required this.phone,
     required this.location,
@@ -39,7 +40,8 @@ class _ProfileData {
     required this.refDetails2,
   });
 
-  final String name;
+  final String firstName;
+  final String lastName;
   final String email;
   final String phone;
   final String location;
@@ -63,6 +65,11 @@ class _ProfileData {
   final String refDetails2;
 
   bool get isPharmacist => locumRole == 'Pharmacist';
+
+  String get fullName {
+    final parts = [firstName.trim(), lastName.trim()].where((p) => p.isNotEmpty);
+    return parts.join(' ');
+  }
 }
 
 /// Locum profile: header, professional, service area, documents (GET `/profile`).
@@ -83,7 +90,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   ProfileDetails? _serverProfile;
   List<ProfileDocument> _documents = [];
 
-  late final TextEditingController _nameController;
+  late final TextEditingController _firstNameController;
+  late final TextEditingController _lastNameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _locationController;
   late final TextEditingController _qualificationsController;
@@ -112,7 +120,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   static const _borderColor = Color(0xFFE0E0E0);
 
   static const _emptyProfile = _ProfileData(
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     location: '',
@@ -146,7 +155,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void initState() {
     super.initState();
     _saved = _emptyProfile;
-    _nameController = TextEditingController();
+    _firstNameController = TextEditingController();
+    _lastNameController = TextEditingController();
     _phoneController = TextEditingController();
     _locationController = TextEditingController();
     _qualificationsController = TextEditingController();
@@ -297,12 +307,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   void _applyProfileDetails(
     ProfileDetails profile, {
-    String? name,
+    String? firstName,
+    String? lastName,
     String? email,
     ProfileUser? user,
   }) {
     _serverProfile = profile;
-    final displayName = name ?? _saved.name;
+    final displayFirst = firstName ??
+        user?.name.trim() ??
+        _saved.firstName;
+    final displayLast = lastName ??
+        user?.lastName.trim() ??
+        _saved.lastName;
     final displayEmail = email ?? _saved.email;
     final role = _displayLocumRole(profile.locumRole);
 
@@ -324,7 +340,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
 
     _saved = _ProfileData(
-      name: displayName,
+      firstName: displayFirst,
+      lastName: displayLast,
       email: displayEmail,
       phone: profile.phone.trim(),
       location: profile.location.trim(),
@@ -350,7 +367,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       refDetails2: user?.refDetails2.trim() ?? _saved.refDetails2,
     );
 
-    _nameController.text = displayName;
+    _firstNameController.text = displayFirst;
+    _lastNameController.text = displayLast;
     _phoneController.text = _phoneDigitsForDisplay(_saved.phone);
     _locationController.text = _saved.location;
     _qualificationsController.text = _saved.qualifications;
@@ -382,7 +400,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (profile != null) {
       _applyProfileDetails(
         profile,
-        name: user?.name.trim(),
+        firstName: user?.name.trim(),
+        lastName: user?.lastName.trim(),
         email: user?.email.trim(),
         user: user,
       );
@@ -450,7 +469,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (profile == null) return null;
 
     final payload = profile.toJson();
-    payload['name'] = _nameController.text.trim();
+    payload['name'] = _firstNameController.text.trim();
+    payload['last_name'] = _lastNameController.text.trim();
     payload['ref_Name_1'] = _proRef1NameController.text.trim();
     payload['ref_PhoneNumber_1'] =
         _phoneForApiFromText(_proRef1PhoneController.text);
@@ -508,7 +528,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   void dispose() {
     _locationController.removeListener(_onLocationFieldChanged);
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _phoneController.dispose();
     _locationController.dispose();
     _qualificationsController.dispose();
@@ -544,7 +565,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (profile != null) {
       _applyProfileDetails(
         profile,
-        name: _saved.name,
+        firstName: _saved.firstName,
+        lastName: _saved.lastName,
         email: _saved.email,
       );
       _seedLocationFromProfile(profile);
@@ -576,9 +598,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       return;
     }
 
-    if (_nameController.text.trim().isEmpty) {
+    if (_firstNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name is required.')),
+        const SnackBar(content: Text('First name is required.')),
+      );
+      return;
+    }
+    if (_lastNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Last name is required.')),
       );
       return;
     }
@@ -631,7 +659,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final updated = result.data!.mergeWith(base);
       final mergedUser = ProfileUser(
         id: base.userId,
-        name: _nameController.text.trim(),
+        name: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
         email: _saved.email,
         role: 'locum',
         address: _addressController.text.trim(),
@@ -656,7 +685,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
       _applyProfileDetails(
         updated,
-        name: mergedUser.name,
+        firstName: mergedUser.name,
+        lastName: mergedUser.lastName,
         email: _saved.email,
         user: mergedUser,
       );
@@ -960,12 +990,51 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 14),
           _editing
-              ? _editableField(
-                  controller: _nameController,
-                  hint: 'Full name',
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _fieldLabel(
+                                'First name',
+                                preserveCase: true,
+                                isRequired: true,
+                              ),
+                              _editableField(
+                                controller: _firstNameController,
+                                hint: 'First name',
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _fieldLabel(
+                                'Last name',
+                                preserveCase: true,
+                                isRequired: true,
+                              ),
+                              _editableField(
+                                controller: _lastNameController,
+                                hint: 'Last name',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 )
               : Text(
-                  _saved.name.isEmpty ? '—' : _saved.name,
+                  _saved.fullName.isEmpty ? '—' : _saved.fullName,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,

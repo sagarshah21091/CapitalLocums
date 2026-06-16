@@ -112,6 +112,14 @@ class ShiftCard extends StatelessWidget {
               text: shift.formattedTimeRange,
               textColor: _titleNavy,
               fontWeight: FontWeight.w600,
+              trailing: Text(
+                shift.lunchBreakCardLabel,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade600,
+                ),
+              ),
             ),
             const SizedBox(height: 10),
             Row(
@@ -228,6 +236,7 @@ class _InfoRow extends StatelessWidget {
     required this.text,
     required this.textColor,
     this.fontWeight,
+    this.trailing,
   });
 
   final IconData icon;
@@ -235,6 +244,7 @@ class _InfoRow extends StatelessWidget {
   final String text;
   final Color textColor;
   final FontWeight? fontWeight;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -252,6 +262,7 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ),
+        ?trailing,
       ],
     );
   }

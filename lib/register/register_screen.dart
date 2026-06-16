@@ -29,7 +29,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _imagePicker = ImagePicker();
 
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _locationController = TextEditingController();
@@ -176,7 +177,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _locationController.dispose();
@@ -604,7 +606,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _submitting = true);
     try {
       final res = await ref.read(registerApiProvider).register(
-            name: _nameController.text,
+            name: _firstNameController.text,
+            lastName: _lastNameController.text,
             email: _emailController.text,
             password: _passwordController.text,
             location: _locationController.text,
@@ -711,10 +714,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     left: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _requiredLabel('Name', isRequired: true),
+                        _requiredLabel('First name', isRequired: true),
                         TextFormField(
-                          controller: _nameController,
-                          decoration: _decoration('Enter full name'),
+                          controller: _firstNameController,
+                          decoration: _decoration('Enter first name'),
                           validator: (v) =>
                               v == null || v.trim().isEmpty ? 'Required' : null,
                           textInputAction: TextInputAction.next,
@@ -724,20 +727,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     right: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _requiredLabel('Email', isRequired: true),
+                        _requiredLabel('Last name', isRequired: true),
                         TextFormField(
-                          controller: _emailController,
-                          decoration: _decoration('name@example.com'),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Required';
-                            if (!v.contains('@')) return 'Invalid email';
-                            return null;
-                          },
+                          controller: _lastNameController,
+                          decoration: _decoration('Enter last name'),
+                          validator: (v) =>
+                              v == null || v.trim().isEmpty ? 'Required' : null,
                           textInputAction: TextInputAction.next,
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  _requiredLabel('Email', isRequired: true),
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: _decoration('name@example.com'),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Required';
+                      if (!v.contains('@')) return 'Invalid email';
+                      return null;
+                    },
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
                   _requiredLabel('Password', isRequired: true),

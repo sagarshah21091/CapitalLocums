@@ -180,6 +180,12 @@ class _ShiftDetailScreenState extends ConsumerState<ShiftDetailScreen> {
                   iconColor: const Color(0xFFE53935),
                 ),
                 _InfoGridItem(
+                  label: 'POSTCODE',
+                  value: shift.displayPostcode,
+                  icon: Icons.location_on_outlined,
+                  iconColor: const Color(0xFFE53935),
+                ),
+                _InfoGridItem(
                   label: 'POSITION',
                   value: ShiftDetail.displayText(shift.locumRole),
                   icon: Icons.person_outline,
@@ -196,6 +202,12 @@ class _ShiftDetailScreenState extends ConsumerState<ShiftDetailScreen> {
                   value: shift.apiLunchBreakText,
                   icon: Icons.free_breakfast_outlined,
                   iconColor: const Color(0xFF37474F),
+                ),
+                _InfoGridItem(
+                  label: 'DISPENSING SYSTEM',
+                  value: shift.displayDispensingSystem,
+                  icon: Icons.medication_outlined,
+                  iconColor: const Color(0xFFFF9800),
                 ),
               ],
             ),

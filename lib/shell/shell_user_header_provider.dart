@@ -40,9 +40,11 @@ final shellUserHeaderProvider =
   try {
     final payload = await ref.read(profileRepositoryProvider).fetchProfile();
     return ShellUserHeader(
-      name: payload.user?.name.trim().isNotEmpty == true
-          ? payload.user!.name.trim()
-          : 'Locum',
+      name: () {
+        final user = payload.user;
+        final full = user?.fullName.trim() ?? '';
+        return full.isNotEmpty ? full : 'Locum';
+      }(),
       yourRole: _formatLocumRole(payload.profile?.locumRole),
     );
   } on ProfileFailure {

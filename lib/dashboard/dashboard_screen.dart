@@ -89,17 +89,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int get _cancelledCount => _bookings.where((b) => b.isCancelled).length;
 
   Future<void> _onCancelBooking(LocumBooking booking) async {
-    final details =
-        '${booking.formattedDate}\n${booking.formattedTimeRange}\n${booking.location}';
-    final cancelled = await confirmAndCancelBooking(
-      context,
-      ref,
-      bookingId: booking.bookingId,
-      details: details,
-    );
-    if (cancelled && mounted) {
-      await _load();
-    }
+    await showCancelBookingDialog(context);
   }
 
   @override

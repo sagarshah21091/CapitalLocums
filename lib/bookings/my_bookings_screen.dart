@@ -6,6 +6,7 @@ import '../api/models/booking_models.dart';
 import '../dashboard/bookings_repository.dart';
 import '../dashboard/cancel_booking_flow.dart';
 import '../dashboard/dashboard_providers.dart';
+import '../router/app_router.dart';
 import 'booking_list_card.dart';
 
 /// All locum bookings — GET `/bookings/my`.
@@ -57,17 +58,16 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> {
   }
 
   Future<void> _onCancelBooking(LocumBooking booking) async {
-    final details =
-        '${booking.formattedDate}\n${booking.formattedTimeRange}\n${booking.location}';
-    final cancelled = await confirmAndCancelBooking(
-      context,
-      ref,
-      bookingId: booking.bookingId,
-      details: details,
+    await showCancelBookingDialog(context);
+  }
+
+  void _onViewDetails(LocumBooking booking) {
+    context.push(
+      AppRoute.shiftDetailPath(
+        booking.shiftId,
+        isBooked: booking.isConfirmed,
+      ),
     );
-    if (cancelled && mounted) {
-      await _load();
-    }
   }
 
   @override
@@ -163,6 +163,7 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen> {
           return BookingListCard(
             booking: booking,
             variant: variant,
+            onViewDetails: () => _onViewDetails(booking),
             onCancel: booking.isConfirmed ? () => _onCancelBooking(booking) : null,
           );
         },

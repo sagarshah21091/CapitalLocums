@@ -86,6 +86,7 @@ class ProfileUser {
   const ProfileUser({
     required this.id,
     required this.name,
+    this.lastName = '',
     required this.email,
     required this.role,
     this.address = '',
@@ -105,6 +106,7 @@ class ProfileUser {
 
   final int id;
   final String name;
+  final String lastName;
   final String email;
   final String role;
   final String address;
@@ -121,10 +123,16 @@ class ProfileUser {
   final String refPhoneNumber2;
   final String refDetails2;
 
+  String get fullName {
+    final parts = [name.trim(), lastName.trim()].where((p) => p.isNotEmpty);
+    return parts.join(' ');
+  }
+
   factory ProfileUser.fromJson(Map<String, dynamic> json) {
     return ProfileUser(
       id: _jsonInt(json['id']),
       name: json['name'] as String? ?? '',
+      lastName: json['last_name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       role: json['role'] as String? ?? '',
       address: json['address'] as String? ?? '',

@@ -16,6 +16,7 @@ class RegisterApi {
 
   Future<RegisterResponse> register({
     required String name,
+    required String lastName,
     required String email,
     required String password,
     required String location,
@@ -55,6 +56,7 @@ class RegisterApi {
     }
 
     addField('name', name.trim());
+    addField('last_name', lastName.trim());
     addField('email', email.trim());
     addField('password', password);
     addField('role', 'locum');
@@ -141,9 +143,8 @@ class RegisterApi {
 }
 
 Future<MultipartFile> _multipartFromXFile(XFile file) async {
+  final name = await resolveRegisterMultipartFilename(file);
   final rawPath = file.path;
-  final name =
-      file.name.trim().isNotEmpty ? file.name.trim() : 'upload.bin';
   final path = rawPath.trim();
   if (path.isNotEmpty) {
     return MultipartFile.fromFile(path, filename: name);

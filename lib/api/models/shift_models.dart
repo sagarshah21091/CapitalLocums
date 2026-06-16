@@ -85,6 +85,7 @@ class ShiftListing {
     required this.isBooked,
     required this.distanceKm,
     required this.distanceMiles,
+    this.lunchBreakMinutes,
   });
 
   final int id;
@@ -102,6 +103,7 @@ class ShiftListing {
   final int isBooked;
   final num distanceKm;
   final num distanceMiles;
+  final int? lunchBreakMinutes;
 
   factory ShiftListing.fromJson(Map<String, dynamic> json) {
     return ShiftListing(
@@ -120,6 +122,8 @@ class ShiftListing {
       isBooked: (json['is_booked'] as num?)?.toInt() ?? 0,
       distanceKm: json['distance_km'] as num? ?? 0,
       distanceMiles: json['distance_miles'] as num? ?? 0,
+      lunchBreakMinutes:
+          _shiftJsonNumNullable(json['lunch_break_minutes'])?.toInt(),
     );
   }
 
@@ -172,6 +176,13 @@ class ShiftListing {
     final n = availableSlots;
     return n == 1 ? '1 Slot' : '$n Slots';
   }
+
+  /// Compact label for shift list cards (e.g. "No break", "30 mins").
+  String get lunchBreakCardLabel {
+    final mins = lunchBreakMinutes;
+    if (mins == null || mins <= 0) return 'No break';
+    return mins == 1 ? '1 min' : '$mins mins';
+  }
 }
 
 class ShiftDetailResponse {
@@ -215,6 +226,8 @@ class ShiftDetail {
     required this.summary,
     required this.locumRole,
     this.lunchBreakMinutes,
+    this.postcode,
+    this.dispensingSystem,
     this.pharmacyName,
     this.contactPerson,
     this.phoneNumber,
@@ -242,6 +255,8 @@ class ShiftDetail {
   final String summary;
   final String locumRole;
   final int? lunchBreakMinutes;
+  final String? postcode;
+  final String? dispensingSystem;
   final String? pharmacyName;
   final String? contactPerson;
   final String? phoneNumber;
@@ -295,6 +310,9 @@ class ShiftDetail {
       locumRole: _shiftJsonString(json['locum_role'] ?? json['locumRole']),
       lunchBreakMinutes: _shiftJsonNumNullable(json['lunch_break_minutes'])
           ?.toInt(),
+      postcode: optionalField('postcode'),
+      dispensingSystem:
+          optionalField('dispensing_system', 'dispensingSystem'),
       pharmacyName: optionalField('pharmacy_name', 'pharmacyName', 'name'),
       contactPerson:
           optionalField('contact_person', 'contactPerson', 'contact_person'),
@@ -359,6 +377,7 @@ class ShiftDetail {
   String get apiLunchBreakText {
     final mins = lunchBreakMinutes;
     if (mins == null) return '—';
+    if (mins <= 0) return 'No lunch break';
     return mins == 1 ? '1 minute' : '$mins minutes';
   }
 
@@ -430,6 +449,8 @@ class ShiftDetail {
   }
 
   String get displayPharmacyName => displayText(pharmacyName ?? '');
+  String get displayPostcode => displayText(postcode ?? '');
+  String get displayDispensingSystem => displayText(dispensingSystem ?? '');
   String get displayContactPerson => displayText(contactPerson ?? '');
   String get displayPhoneNumber => displayText(phoneNumber ?? '');
   String get displayPharmacyAddress => displayText(pharmacyAddress ?? '');
