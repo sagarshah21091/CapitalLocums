@@ -162,6 +162,12 @@ class _ShiftDetailScreenState extends ConsumerState<ShiftDetailScreen> {
               runSpacing: 12,
               items: [
                 _InfoGridItem(
+                  label: 'PHARMACY NAME',
+                  value: shift.displayPharmacyName,
+                  icon: Icons.business_outlined,
+                  iconColor: BrandColors.primaryBlue,
+                ),
+                _InfoGridItem(
                   label: 'DATE',
                   value: shift.formattedCalendarDate,
                   icon: Icons.calendar_today_outlined,
@@ -224,14 +230,6 @@ class _ShiftDetailScreenState extends ConsumerState<ShiftDetailScreen> {
                 color: Colors.grey.shade800,
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          _SectionCard(
-            title: 'Pharmacy Information',
-            titleIcon: Icons.store_outlined,
-            titleIconColor: BrandColors.primaryBlue,
-            compact: true,
-            child: _CompactPharmacyInfo(shift: shift),
           ),
           const SizedBox(height: 12),
           _BookNowCard(
@@ -361,15 +359,11 @@ class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
     required this.child,
-    this.titleIcon,
-    this.titleIconColor,
     this.compact = false,
   });
 
   final String title;
   final Widget child;
-  final IconData? titleIcon;
-  final Color? titleIconColor;
   final bool compact;
 
   @override
@@ -394,25 +388,13 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              if (titleIcon != null) ...[
-                Icon(
-                  titleIcon,
-                  size: compact ? 20 : 22,
-                  color: titleIconColor ?? _ShiftDetailScreenState._titleNavy,
-                ),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: compact ? 16 : 17,
-                  fontWeight: FontWeight.w700,
-                  color: _ShiftDetailScreenState._titleNavy,
-                ),
-              ),
-            ],
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: compact ? 16 : 17,
+              fontWeight: FontWeight.w700,
+              color: _ShiftDetailScreenState._titleNavy,
+            ),
           ),
           SizedBox(height: titleGap),
           child,
@@ -514,115 +496,6 @@ class _InfoGridCell extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: _ShiftDetailScreenState._titleNavy,
             height: 1.25,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CompactPharmacyInfo extends StatelessWidget {
-  const _CompactPharmacyInfo({required this.shift});
-
-  final ShiftDetail shift;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = <_CompactRow>[
-      _CompactRow(
-        label: 'PHARMACY NAME',
-        value: shift.displayPharmacyName,
-        icon: Icons.business_outlined,
-        iconColor: BrandColors.primaryBlue,
-      ),
-      _CompactRow(
-        label: 'CONTACT PERSON',
-        value: shift.displayContactPerson,
-        icon: Icons.person_outline,
-        iconColor: _ShiftDetailScreenState._openGreen,
-      ),
-      _CompactRow(
-        label: 'PHONE NUMBER',
-        value: shift.displayPhoneNumber,
-        icon: Icons.phone_outlined,
-        iconColor: BrandColors.primaryBlue,
-      ),
-      _CompactRow(
-        label: 'ADDRESS',
-        value: shift.displayPharmacyAddress,
-        icon: Icons.location_on_outlined,
-        iconColor: const Color(0xFFE53935),
-      ),
-      _CompactRow(
-        label: 'LICENSE NUMBER',
-        value: shift.displayLicenseNumber,
-        icon: Icons.badge_outlined,
-        iconColor: const Color(0xFF37474F),
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
-          _CompactPharmacyRow(row: rows[i]),
-        ],
-      ],
-    );
-  }
-}
-
-class _CompactRow {
-  const _CompactRow({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.iconColor,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color iconColor;
-}
-
-class _CompactPharmacyRow extends StatelessWidget {
-  const _CompactPharmacyRow({required this.row});
-
-  final _CompactRow row;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(row.icon, size: 17, color: row.iconColor),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                row.label,
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                  color: _ShiftDetailScreenState._labelGray,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                row.value,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _ShiftDetailScreenState._titleNavy,
-                  height: 1.25,
-                ),
-              ),
-            ],
           ),
         ),
       ],

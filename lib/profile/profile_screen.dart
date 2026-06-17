@@ -488,7 +488,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (AppEnv.googleMapsApiKey.isEmpty) return null;
     final picked = ref.read(registerLocationProvider);
     if (picked == null || picked.formattedAddress.trim() != text) {
-      return 'Choose a location from the suggestions';
+      return 'Choose an address from the suggestions';
     }
     return null;
   }
@@ -645,7 +645,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     } else if (_locationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location is required.')),
+        const SnackBar(content: Text('Address is required.')),
       );
       return;
     }
@@ -1072,7 +1072,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Text(
               _editing
                   ? (_locationController.text.isEmpty
-                      ? 'Edit location below'
+                      ? 'Edit address below'
                       : _locationController.text)
                   : (_saved.location.isEmpty ? '—' : _saved.location),
               style: TextStyle(
@@ -1438,10 +1438,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle(Icons.location_on_outlined, 'Service location'),
+          _sectionTitle(Icons.location_on_outlined, 'Service address'),
           const SizedBox(height: 16),
           Text(
-            'LOCATION',
+            'ADDRESS',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -1470,7 +1470,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: 4),
             Text(
               AppEnv.googleMapsApiKey.isEmpty
-                  ? 'Enter location manually or add GOOGLE_MAPS_API_KEY to .env.'
+                  ? 'Enter address manually or add GOOGLE_MAPS_API_KEY to .env.'
                   : 'Start typing to search — tap a suggestion to update coordinates.',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),

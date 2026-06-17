@@ -170,7 +170,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
     final picked = ref.read(registerLocationProvider);
     if (picked == null || picked.formattedAddress.trim() != text.trim()) {
-      return 'Choose a location from the suggestions';
+      return 'Choose an address from the suggestions';
     }
     return null;
   }
@@ -774,7 +774,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
-                  _requiredLabel('Location', isRequired: true),
+                  _requiredLabel('Address', isRequired: true),
                   RegisterLocationAutocomplete(
                     controller: _locationController,
                     decoration: _decoration('Search by address / area'),
@@ -784,7 +784,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 4),
                   Text(
                     AppEnv.googleMapsApiKey.isEmpty
-                        ? 'Add GOOGLE_MAPS_API_KEY to .env for suggestions, or enter a location manually.'
+                        ? 'Add GOOGLE_MAPS_API_KEY to .env for suggestions, or enter an address manually.'
                         : 'Start typing to search — tap a suggestion to save coordinates locally.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                   ),

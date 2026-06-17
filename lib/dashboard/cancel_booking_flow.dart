@@ -41,19 +41,16 @@ Future<void> showCancelBookingDialog(BuildContext context) async {
                 style: TextStyle(
                   fontSize: 15,
                   height: 1.45,
-                  color: Colors.grey.shade700,
+                  color: Colors.grey.shade800,
                 ),
                 children: [
-                  const TextSpan(
-                    text: 'For Cancellations, click here for contact ',
-                  ),
                   WidgetSpan(
                     alignment: PlaceholderAlignment.baseline,
                     baseline: TextBaseline.alphabetic,
                     child: GestureDetector(
                       onTap: () => _openContactPage(ctx),
                       child: const Text(
-                        'Capital Locums',
+                        'Click here',
                         style: TextStyle(
                           fontSize: 15,
                           color: BrandColors.primaryBlue,
@@ -62,6 +59,7 @@ Future<void> showCancelBookingDialog(BuildContext context) async {
                       ),
                     ),
                   ),
+                  const TextSpan(text: ' to contact Capital Locums'),
                 ],
               ),
             ),

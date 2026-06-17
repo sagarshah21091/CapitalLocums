@@ -56,15 +56,6 @@ class MainShellScreen extends ConsumerWidget {
                 ref.read(shiftsFilterOpenTriggerProvider.notifier).open();
               },
             ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            tooltip: 'Notifications',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No new notifications')),
-              );
-            },
-          ),
         ],
       ),
       body: navigationShell,
