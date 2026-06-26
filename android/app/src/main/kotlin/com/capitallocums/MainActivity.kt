@@ -1,4 +1,4 @@
-package com.capitallocums.capitallocums
+package com.capitallocums
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker_android/image_picker_android.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_version.dart';
@@ -7,8 +10,18 @@ import 'brand_colors.dart';
 import 'env/app_env.dart';
 import 'router/app_router.dart';
 
+void _configureAndroidPhotoPicker() {
+  if (defaultTargetPlatform != TargetPlatform.android) return;
+
+  final imagePickerImplementation = ImagePickerPlatform.instance;
+  if (imagePickerImplementation is ImagePickerAndroid) {
+    imagePickerImplementation.useAndroidPhotoPicker = true;
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _configureAndroidPhotoPicker();
 
   await AppEnv.load();
   await initAppVersion();
