@@ -86,6 +86,9 @@ class _FindShiftsScreenState extends ConsumerState<FindShiftsScreen> {
           location: location,
           latitude: lat,
           longitude: lng,
+          positionType: ShiftsSearchFilters.positionTypeFromProfileRole(
+            profile.locumRole,
+          ),
         );
       });
     } catch (_) {

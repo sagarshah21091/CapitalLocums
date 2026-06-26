@@ -51,8 +51,22 @@ class ShiftsSearchFilters {
   String get apiDateTo => _formatDate(endDate);
 
   String get apiLocumRole {
-    if (positionType == allPositions) return '';
+    if (positionType == allPositions) return 'all';
     return positionType.toLowerCase();
+  }
+
+  /// Maps profile/register `locum_role` to a filter dropdown value.
+  static String positionTypeFromProfileRole(String? apiRole) {
+    switch (apiRole?.trim().toLowerCase()) {
+      case 'pharmacist':
+        return 'Pharmacist';
+      case 'technician':
+        return 'Technician';
+      case 'dispenser':
+        return 'Dispenser';
+      default:
+        return allPositions;
+    }
   }
 }
 
