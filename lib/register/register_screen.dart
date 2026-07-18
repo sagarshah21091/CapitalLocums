@@ -119,7 +119,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     bool isPharmacist,
   ) {
     return [
-      (index: RegisterDocSlot.passport, label: 'Passport', isRequired: true),
+      (index: RegisterDocSlot.passport, label: 'Passport', isRequired: false),
       (
         index: RegisterDocSlot.visaWorkPermit,
         label: 'Visa/Work permit (if required)',
@@ -128,19 +128,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       (
         index: RegisterDocSlot.nationalInsurance,
         label: 'National insurance',
-        isRequired: true,
+        isRequired: false,
       ),
       if (isPharmacist)
         (
           index: RegisterDocSlot.dbsCheck,
           label: 'DBS Check',
-          isRequired: true,
+          isRequired: false,
         ),
     ];
   }
 
-  static final _passwordSpecialCharPattern =
-      RegExp(r'''[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/`~;']''');
+  static final _passwordSpecialCharPattern = RegExp(
+    r'''[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/`~;']''',
+  );
 
   static List<String> _passwordRequirementGaps(String password) {
     final gaps = <String>[];
@@ -164,7 +165,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   String? _validateLocation(String? v) {
     final text = v?.trim() ?? '';
-    if (text.isEmpty) return 'Required';
+    if (text.isEmpty) return null;
     if (AppEnv.googleMapsApiKey.isEmpty) {
       return null;
     }
@@ -219,7 +220,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(_radius),
-        borderSide: const BorderSide(color: BrandColors.primaryBlue, width: 1.4),
+        borderSide: const BorderSide(
+          color: BrandColors.primaryBlue,
+          width: 1.4,
+        ),
       ),
     );
   }
@@ -245,7 +249,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             if (isRequired)
               const TextSpan(
                 text: ' *',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
           ],
         ),
@@ -353,9 +360,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final uri = Uri.parse(url);
     if (!await canLaunchUrl(uri)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open link')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not open link')));
       return;
     }
     await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -363,6 +370,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   static String _phoneForApiFromText(String raw) {
     var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return '';
     if (digits.startsWith('44')) {
       digits = digits.substring(2);
     }
@@ -381,11 +389,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     required DateTime lastDate,
     DateTime? initialDate,
   }) {
-    Future<void> pick() => _pickDate(
-          controller,
-          lastDate: lastDate,
-          initialDate: initialDate,
-        );
+    Future<void> pick() =>
+        _pickDate(controller, lastDate: lastDate, initialDate: initialDate);
     return TextFormField(
       controller: controller,
       readOnly: true,
@@ -406,6 +411,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       decoration: _decoration,
       radius: _radius,
       border: _border,
+      isRequired: false,
     );
   }
 
@@ -478,7 +484,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _pickQualificationCert() async {
     final notifier = ref.read(registerQualificationCertsProvider.notifier);
-    final remaining = RegisterQualificationCerts.maxCount -
+    final remaining =
+        RegisterQualificationCerts.maxCount -
         ref.read(registerQualificationCertsProvider).length;
     if (remaining <= 0) {
       if (!mounted) return;
@@ -567,20 +574,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return null;
   }
 
-  String? _validateDocuments() {
-    final docs = ref.read(registerDocumentsProvider);
-    for (final entry in _documentEntries(_isPharmacist)) {
-      if (entry.isRequired && docs[entry.index] == null) {
-        return 'Please attach: ${entry.label}';
-      }
-    }
-    final qualCerts = ref.read(registerQualificationCertsProvider);
-    if (qualCerts.isEmpty) {
-      return 'Please attach at least one qualification certificate';
-    }
-    return null;
-  }
-
   String? _validateTermsAgreements() {
     if (!_agreedRoleTc || !_agreedPrivacyPolicy) {
       return _termsConfigForRole(_yourRole).validationMessage;
@@ -605,7 +598,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     setState(() => _submitting = true);
     try {
-      final res = await ref.read(registerApiProvider).register(
+      final res = await ref
+          .read(registerApiProvider)
+          .register(
             name: _firstNameController.text,
             lastName: _lastNameController.text,
             email: _emailController.text,
@@ -626,23 +621,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             zipCode: _zipCodeController.text,
             dateOfBirth: _dateToApi(_dateOfBirthController.text.trim()),
             gender: _gender!,
-            qualificationDate:
-                _dateToApi(_qualificationDateController.text.trim()),
+            qualificationDate: _dateToApi(
+              _qualificationDateController.text.trim(),
+            ),
             independentPrescriber: _isPharmacist
                 ? (_independentPrescriber! ? '1' : '0')
                 : null,
             agreedPharmacistTerms: _agreedRoleTc,
             agreedPrivacyPolicy: _agreedPrivacyPolicy,
-            passport: docs[RegisterDocSlot.passport]!,
-            nationalInsurance: docs[RegisterDocSlot.nationalInsurance]!,
+            passport: docs[RegisterDocSlot.passport],
+            nationalInsurance: docs[RegisterDocSlot.nationalInsurance],
             qualificationCertificates: qualCerts,
             professionalReference1Name: _proRef1NameController.text,
-            professionalReference1Phone:
-                _phoneForApiFromText(_proRef1PhoneController.text),
+            professionalReference1Phone: _phoneForApiFromText(
+              _proRef1PhoneController.text,
+            ),
             professionalReference1Details: _proRef1DetailsController.text,
             professionalReference2Name: _proRef2NameController.text,
-            professionalReference2Phone:
-                _phoneForApiFromText(_proRef2PhoneController.text),
+            professionalReference2Phone: _phoneForApiFromText(
+              _proRef2PhoneController.text,
+            ),
             professionalReference2Details: _proRef2DetailsController.text,
             visaWorkPermit: docs[RegisterDocSlot.visaWorkPermit],
             dbsCheck: _isPharmacist ? docs[RegisterDocSlot.dbsCheck] : null,
@@ -664,9 +662,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       context.go(AppRoute.login);
     } on RegisterApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -703,555 +701,555 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Form(
               key: _formKey,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 20,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                  _RegisterHeader(),
-                  const SizedBox(height: 28),
-                  _twoCol(
-                    wide: wide,
-                    left: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('First name', isRequired: true),
-                        TextFormField(
-                          controller: _firstNameController,
-                          decoration: _decoration('Enter first name'),
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
-                          textInputAction: TextInputAction.next,
-                        ),
-                      ],
-                    ),
-                    right: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Last name', isRequired: true),
-                        TextFormField(
-                          controller: _lastNameController,
-                          decoration: _decoration('Enter last name'),
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
-                          textInputAction: TextInputAction.next,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _requiredLabel('Email', isRequired: true),
-                  TextFormField(
-                    controller: _emailController,
-                    decoration: _decoration('name@example.com'),
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Required';
-                      if (!v.contains('@')) return 'Invalid email';
-                      return null;
-                    },
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 16),
-                  _requiredLabel('Password', isRequired: true),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: _decoration('Strong password').copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 20,
-                        ),
-                        onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword,
-                        ),
+                    _RegisterHeader(),
+                    const SizedBox(height: 28),
+                    _twoCol(
+                      wide: wide,
+                      left: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('First name', isRequired: true),
+                          TextFormField(
+                            controller: _firstNameController,
+                            decoration: _decoration('Enter first name'),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ],
+                      ),
+                      right: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('Last name', isRequired: true),
+                          TextFormField(
+                            controller: _lastNameController,
+                            decoration: _decoration('Enter last name'),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ],
                       ),
                     ),
-                    validator: _validatePassword,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 16),
-                  _requiredLabel('Address', isRequired: true),
-                  RegisterLocationAutocomplete(
-                    controller: _locationController,
-                    decoration: _decoration('Search by address / area'),
-                    validator: _validateLocation,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    AppEnv.googleMapsApiKey.isEmpty
-                        ? 'Add GOOGLE_MAPS_API_KEY to .env for suggestions, or enter an address manually.'
-                        : 'Start typing to search — tap a suggestion to save coordinates locally.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                  const SizedBox(height: 16),
-                  _twoCol(
-                    wide: wide,
-                    left: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Phone', isRequired: true),
-                        _phoneWithCountryCode(),
-                      ],
+                    const SizedBox(height: 16),
+                    _requiredLabel('Email', isRequired: true),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: _decoration('name@example.com'),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (!v.contains('@')) return 'Invalid email';
+                        return null;
+                      },
+                      textInputAction: TextInputAction.next,
                     ),
-                    right: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Qualifications', isRequired: true),
-                        TextFormField(
-                          controller: _qualificationsController,
-                          decoration: _decoration('PharmD, B.Pharm, etc.'),
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
-                          textInputAction: TextInputAction.next,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _twoCol(
-                    wide: wide,
-                    left: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Experience years', isRequired: true),
-                        TextFormField(
-                          controller: _experienceController,
-                          decoration: _decoration('Years'),
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                          validator: _validateExperience,
-                          textInputAction: TextInputAction.next,
-                        ),
-                      ],
-                    ),
-                    right: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Travel distance (miles)', isRequired: true),
-                        TextFormField(
-                          controller: _travelMilesController,
-                          decoration: _decoration('e.g. 25'),
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                          validator: _validateTravelMiles,
-                          textInputAction: TextInputAction.done,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _twoCol(
-                    wide: wide,
-                    left: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Your role', isRequired: true),
-                        InputDecorator(
-                          decoration:
-                              _decoration('').copyWith(hintText: null),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _yourRole,
-                              isExpanded: true,
-                              isDense: true,
-                              items: _yourRoleOptions
-                                  .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e,
-                                      child: Text(e),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) {
-                                if (v == null) return;
-                                setState(() {
-                                  _yourRole = v;
-                                  _agreedRoleTc = false;
-                                  if (v != 'Pharmacist') {
-                                    _independentPrescriber = null;
-                                    ref
-                                        .read(
-                                          registerDocumentsProvider.notifier,
-                                        )
-                                        .setFile(
-                                          RegisterDocSlot.dbsCheck,
-                                          null,
-                                        );
-                                  }
-                                });
-                              },
-                            ),
+                    const SizedBox(height: 16),
+                    _requiredLabel('Password', isRequired: true),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      decoration: _decoration('Strong password').copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            size: 20,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
                           ),
                         ),
-                      ],
+                      ),
+                      validator: _validatePassword,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      textInputAction: TextInputAction.next,
                     ),
-                    right: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel(
-                          'GPhC number (7 digits)',
-                          isRequired: _isPharmacist,
-                          uppercase: false,
-                        ),
-                        TextFormField(
-                          key: ValueKey('gphc_$_yourRole'),
-                          controller: _gphcController,
-                          decoration: _decoration('1234567'),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(7),
-                          ],
-                          validator: (v) {
-                            final t = v?.trim() ?? '';
-                            if (t.isEmpty) {
-                              return _isPharmacist ? 'Required' : null;
-                            }
-                            if (t.length != 7) {
-                              return 'Enter exactly 7 digits';
-                            }
-                            return null;
-                          },
-                          textInputAction: TextInputAction.next,
-                        ),
-                      ],
+                    const SizedBox(height: 16),
+                    _requiredLabel('Address', isRequired: false),
+                    RegisterLocationAutocomplete(
+                      controller: _locationController,
+                      decoration: _decoration('Search by address / area'),
+                      validator: _validateLocation,
+                      textInputAction: TextInputAction.next,
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _requiredLabel('Address', isRequired: true),
-                  TextFormField(
-                    controller: _addressController,
-                    decoration: _decoration('Street address'),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Required' : null,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 16),
-                  _threeCol(
-                    wide: wide,
-                    a: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('City', isRequired: true),
-                        TextFormField(
-                          controller: _cityController,
-                          decoration: _decoration('City'),
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
-                          textInputAction: TextInputAction.next,
-                        ),
-                      ],
+                    const SizedBox(height: 4),
+                    Text(
+                      AppEnv.googleMapsApiKey.isEmpty
+                          ? 'Add GOOGLE_MAPS_API_KEY to .env for suggestions, or enter an address manually.'
+                          : 'Start typing to search — tap a suggestion to save coordinates locally.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
-                    b: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Zip code', isRequired: true),
-                        TextFormField(
-                          controller: _zipCodeController,
-                          decoration: _decoration('Postcode'),
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
-                          textInputAction: TextInputAction.next,
-                        ),
-                      ],
+                    const SizedBox(height: 16),
+                    _requiredLabel('Address 2', isRequired: false),
+                    TextFormField(
+                      controller: _addressController,
+                      decoration: _decoration('Address 2'),
+                      textInputAction: TextInputAction.next,
                     ),
-                    c: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Date of birth', isRequired: true),
-                        _dateField(
-                          controller: _dateOfBirthController,
-                          hint: 'dd/mm/yyyy',
-                          validator: _validateDdMmYyyy,
-                          lastDate: DateTime.now(),
-                          initialDate: DateTime.now(),
-                        ),
-                      ],
+                    const SizedBox(height: 16),
+                    _twoCol(
+                      wide: wide,
+                      left: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('City', isRequired: false),
+                          TextFormField(
+                            controller: _cityController,
+                            decoration: _decoration('City'),
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ],
+                      ),
+                      right: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('Zip code', isRequired: false),
+                          TextFormField(
+                            controller: _zipCodeController,
+                            decoration: _decoration('Postcode'),
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _threeCol(
-                    wide: wide,
-                    a: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Gender', isRequired: true),
-                        FormField<String>(
-                          initialValue: _gender,
-                          validator: (v) => v == null ? 'Required' : null,
-                          builder: (field) {
-                            return InputDecorator(
-                              decoration: _decoration('Select gender').copyWith(
-                                errorText: field.errorText,
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: field.value,
-                                  isExpanded: true,
-                                  isDense: true,
-                                  hint: const Text('Select gender'),
-                                  items: _genderOptions
-                                      .map(
-                                        (e) => DropdownMenuItem(
-                                          value: e,
-                                          child: Text(e),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) {
-                                    field.didChange(v);
-                                    setState(() => _gender = v);
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                    const SizedBox(height: 16),
+                    _twoCol(
+                      wide: wide,
+                      left: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('Phone', isRequired: false),
+                          _phoneWithCountryCode(),
+                        ],
+                      ),
+                      right: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('Qualifications', isRequired: true),
+                          TextFormField(
+                            controller: _qualificationsController,
+                            decoration: _decoration('PharmD, B.Pharm, etc.'),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ],
+                      ),
                     ),
-                    b: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _requiredLabel('Qualification date', isRequired: true),
-                        _dateField(
-                          controller: _qualificationDateController,
-                          hint: 'dd/mm/yyyy',
-                          validator: _validateDdMmYyyy,
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                          initialDate: DateTime.now(),
-                        ),
-                      ],
+                    const SizedBox(height: 16),
+                    _twoCol(
+                      wide: wide,
+                      left: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('Experience years', isRequired: true),
+                          TextFormField(
+                            controller: _experienceController,
+                            decoration: _decoration('Years'),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: _validateExperience,
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ],
+                      ),
+                      right: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel(
+                            'Travel distance (miles)',
+                            isRequired: true,
+                          ),
+                          TextFormField(
+                            controller: _travelMilesController,
+                            decoration: _decoration('e.g. 25'),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: _validateTravelMiles,
+                            textInputAction: TextInputAction.done,
+                          ),
+                        ],
+                      ),
                     ),
-                    c: _isPharmacist
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _requiredLabel(
-                                'Independent prescriber',
-                                isRequired: true,
-                              ),
-                              FormField<bool?>(
-                                key: ValueKey(
-                                  'independent_prescriber_$_yourRole',
-                                ),
-                                initialValue: _independentPrescriber,
-                                validator: (value) =>
-                                    value == null ? 'Required' : null,
-                                builder: (field) {
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      _IndependentPrescriberField(
-                                        value: field.value,
-                                        onChanged: (v) {
-                                          field.didChange(v);
-                                          setState(
-                                            () => _independentPrescriber = v,
-                                          );
-                                        },
+                    const SizedBox(height: 16),
+                    _twoCol(
+                      wide: wide,
+                      left: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('Your role', isRequired: true),
+                          InputDecorator(
+                            decoration: _decoration(
+                              '',
+                            ).copyWith(hintText: null),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _yourRole,
+                                isExpanded: true,
+                                isDense: true,
+                                items: _yourRoleOptions
+                                    .map(
+                                      (e) => DropdownMenuItem(
+                                        value: e,
+                                        child: Text(e),
                                       ),
-                                      if (field.hasError)
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 6),
-                                          child: Text(
-                                            field.errorText!,
-                                            style: const TextStyle(
-                                              color: Colors.red,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  );
+                                    )
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v == null) return;
+                                  setState(() {
+                                    _yourRole = v;
+                                    _agreedRoleTc = false;
+                                    if (v != 'Pharmacist') {
+                                      _independentPrescriber = null;
+                                      ref
+                                          .read(
+                                            registerDocumentsProvider.notifier,
+                                          )
+                                          .setFile(
+                                            RegisterDocSlot.dbsCheck,
+                                            null,
+                                          );
+                                    }
+                                  });
                                 },
                               ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      right: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel(
+                            'GPhC number (7 digits)',
+                            isRequired: _isPharmacist,
+                            uppercase: false,
+                          ),
+                          TextFormField(
+                            key: ValueKey('gphc_$_yourRole'),
+                            controller: _gphcController,
+                            decoration: _decoration('1234567'),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(7),
                             ],
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                  const SizedBox(height: 28),
-                  _ProfessionalReferencesSection(
-                    requiredLabel: _requiredLabel,
-                    decoration: _decoration,
-                    radius: _radius,
-                    border: _border,
-                    proRef1Name: _proRef1NameController,
-                    proRef1Phone: _proRef1PhoneController,
-                    proRef1Details: _proRef1DetailsController,
-                    proRef2Name: _proRef2NameController,
-                    proRef2Phone: _proRef2PhoneController,
-                    proRef2Details: _proRef2DetailsController,
-                  ),
-                  const SizedBox(height: 28),
-                  FormField<void>(
-                    key: ValueKey('documents_$_isPharmacist'),
-                    validator: (_) => _validateDocuments(),
-                    builder: (field) {
-                      final qualCerts = ref.watch(registerQualificationCertsProvider);
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _DocumentsCard(
-                            docSlots: _documentEntries(_isPharmacist),
-                            docFiles: docFiles,
-                            onPick: (index) async {
-                              await _pickDocument(index);
-                              field.didChange(null);
+                            validator: (v) {
+                              final t = v?.trim() ?? '';
+                              if (t.isEmpty) {
+                                return _isPharmacist ? 'Required' : null;
+                              }
+                              if (t.length != 7) {
+                                return 'Enter exactly 7 digits';
+                              }
+                              return null;
                             },
-                            onClear: (index) {
-                              ref
-                                  .read(registerDocumentsProvider.notifier)
-                                  .setFile(index, null);
-                              field.didChange(null);
-                            },
-                            borderColor: _border,
-                            radius: _radius,
-                            hasError: field.hasError,
+                            textInputAction: TextInputAction.next,
                           ),
-                          const SizedBox(height: 16),
-                          _QualificationCertificatesCard(
-                            certs: qualCerts,
-                            onAdd: () async {
-                              await _pickQualificationCert();
-                              field.didChange(null);
-                            },
-                            onRemove: (index) {
-                              ref
-                                  .read(
-                                    registerQualificationCertsProvider.notifier,
-                                  )
-                                  .removeAt(index);
-                              field.didChange(null);
-                            },
-                            borderColor: _border,
-                            radius: _radius,
-                            hasError: field.hasError,
-                          ),
-                          if (field.hasError)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                field.errorText!,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
                         ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 28),
-                  FormField<void>(
-                    validator: (_) => _validateTermsAgreements(),
-                    builder: (field) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _RoleTermsSection(
-                            key: ValueKey(_yourRole),
-                            config: _termsConfigForRole(_yourRole),
-                            agreedRoleTc: _agreedRoleTc,
-                            agreedPrivacyPolicy: _agreedPrivacyPolicy,
-                            onRoleTcChanged: (v) {
-                              setState(() => _agreedRoleTc = v);
-                              field.didChange(null);
-                            },
-                            onPrivacyPolicyChanged: (v) {
-                              setState(() => _agreedPrivacyPolicy = v);
-                              field.didChange(null);
-                            },
-                            onOpenUrl: _openExternalUrl,
-                            privacyPolicyUrl: _privacyPolicyUrl,
-                            hasError: field.hasError,
-                          ),
-                          if (field.hasError)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                field.errorText!,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: BrandColors.primaryBlue,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(_radius),
-                        ),
                       ),
-                      onPressed: _submitting ? null : _onRegister,
-                      child: _submitting
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: Colors.white,
-                              ),
+                    ),
+                    const SizedBox(height: 16),
+                    _requiredLabel('Date of birth', isRequired: true),
+                    _dateField(
+                      controller: _dateOfBirthController,
+                      hint: 'dd/mm/yyyy',
+                      validator: _validateDdMmYyyy,
+                      lastDate: DateTime.now(),
+                      initialDate: DateTime.now(),
+                    ),
+                    const SizedBox(height: 16),
+                    _threeCol(
+                      wide: wide,
+                      a: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel('Gender', isRequired: true),
+                          FormField<String>(
+                            initialValue: _gender,
+                            validator: (v) => v == null ? 'Required' : null,
+                            builder: (field) {
+                              return InputDecorator(
+                                decoration: _decoration(
+                                  'Select gender',
+                                ).copyWith(errorText: field.errorText),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: field.value,
+                                    isExpanded: true,
+                                    isDense: true,
+                                    hint: const Text('Select gender'),
+                                    items: _genderOptions
+                                        .map(
+                                          (e) => DropdownMenuItem(
+                                            value: e,
+                                            child: Text(e),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (v) {
+                                      field.didChange(v);
+                                      setState(() => _gender = v);
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      b: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _requiredLabel(
+                            'Qualification date',
+                            isRequired: true,
+                          ),
+                          _dateField(
+                            controller: _qualificationDateController,
+                            hint: 'dd/mm/yyyy',
+                            validator: _validateDdMmYyyy,
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
+                            initialDate: DateTime.now(),
+                          ),
+                        ],
+                      ),
+                      c: _isPharmacist
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _requiredLabel(
+                                  'Independent prescriber',
+                                  isRequired: true,
+                                ),
+                                FormField<bool?>(
+                                  key: ValueKey(
+                                    'independent_prescriber_$_yourRole',
+                                  ),
+                                  initialValue: _independentPrescriber,
+                                  validator: (value) =>
+                                      value == null ? 'Required' : null,
+                                  builder: (field) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        _IndependentPrescriberField(
+                                          value: field.value,
+                                          onChanged: (v) {
+                                            field.didChange(v);
+                                            setState(
+                                              () => _independentPrescriber = v,
+                                            );
+                                          },
+                                        ),
+                                        if (field.hasError)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 6,
+                                            ),
+                                            child: Text(
+                                              field.errorText!,
+                                              style: const TextStyle(
+                                                color: Colors.red,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
                             )
-                          : const Text(
-                              'Register',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                          : const SizedBox.shrink(),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  Center(
-                    child: Text.rich(
-                      TextSpan(
-                        style: TextStyle(
-                          color: Colors.grey.shade800,
-                          fontSize: 14,
+                    const SizedBox(height: 28),
+                    _ProfessionalReferencesSection(
+                      requiredLabel: _requiredLabel,
+                      decoration: _decoration,
+                      radius: _radius,
+                      border: _border,
+                      proRef1Name: _proRef1NameController,
+                      proRef1Phone: _proRef1PhoneController,
+                      proRef1Details: _proRef1DetailsController,
+                      proRef2Name: _proRef2NameController,
+                      proRef2Phone: _proRef2PhoneController,
+                      proRef2Details: _proRef2DetailsController,
+                    ),
+                    const SizedBox(height: 28),
+                    FormField<void>(
+                      key: ValueKey('documents_$_isPharmacist'),
+                      builder: (field) {
+                        final qualCerts = ref.watch(
+                          registerQualificationCertsProvider,
+                        );
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _DocumentsCard(
+                              docSlots: _documentEntries(_isPharmacist),
+                              docFiles: docFiles,
+                              onPick: (index) async {
+                                await _pickDocument(index);
+                                field.didChange(null);
+                              },
+                              onClear: (index) {
+                                ref
+                                    .read(registerDocumentsProvider.notifier)
+                                    .setFile(index, null);
+                                field.didChange(null);
+                              },
+                              borderColor: _border,
+                              radius: _radius,
+                              hasError: false,
+                            ),
+                            const SizedBox(height: 16),
+                            _QualificationCertificatesCard(
+                              certs: qualCerts,
+                              onAdd: () async {
+                                await _pickQualificationCert();
+                                field.didChange(null);
+                              },
+                              onRemove: (index) {
+                                ref
+                                    .read(
+                                      registerQualificationCertsProvider
+                                          .notifier,
+                                    )
+                                    .removeAt(index);
+                                field.didChange(null);
+                              },
+                              borderColor: _border,
+                              radius: _radius,
+                              hasError: false,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 28),
+                    FormField<void>(
+                      validator: (_) => _validateTermsAgreements(),
+                      builder: (field) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _RoleTermsSection(
+                              key: ValueKey(_yourRole),
+                              config: _termsConfigForRole(_yourRole),
+                              agreedRoleTc: _agreedRoleTc,
+                              agreedPrivacyPolicy: _agreedPrivacyPolicy,
+                              onRoleTcChanged: (v) {
+                                setState(() => _agreedRoleTc = v);
+                                field.didChange(null);
+                              },
+                              onPrivacyPolicyChanged: (v) {
+                                setState(() => _agreedPrivacyPolicy = v);
+                                field.didChange(null);
+                              },
+                              onOpenUrl: _openExternalUrl,
+                              privacyPolicyUrl: _privacyPolicyUrl,
+                              hasError: field.hasError,
+                            ),
+                            if (field.hasError)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  field.errorText!,
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: BrandColors.primaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(_radius),
+                          ),
                         ),
-                        children: [
-                          const TextSpan(text: 'Already have an account? '),
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.baseline,
-                            baseline: TextBaseline.alphabetic,
-                            child: GestureDetector(
-                              onTap: () => context.go(AppRoute.login),
-                              child: const Text(
-                                'Login',
+                        onPressed: _submitting ? null : _onRegister,
+                        child: _submitting
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Register',
                                 style: TextStyle(
-                                  color: BrandColors.primaryBlue,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Center(
+                      child: Text.rich(
+                        TextSpan(
+                          style: TextStyle(
+                            color: Colors.grey.shade800,
+                            fontSize: 14,
+                          ),
+                          children: [
+                            const TextSpan(text: 'Already have an account? '),
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.baseline,
+                              baseline: TextBaseline.alphabetic,
+                              child: GestureDetector(
+                                onTap: () => context.go(AppRoute.login),
+                                child: const Text(
+                                  'Login',
+                                  style: TextStyle(
+                                    color: BrandColors.primaryBlue,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -1279,11 +1277,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        left,
-        const SizedBox(height: 16),
-        right,
-      ],
+      children: [left, const SizedBox(height: 16), right],
     );
   }
 
@@ -1349,9 +1343,7 @@ class _IndependentPrescriberField extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                selected
-                    ? Icons.check_box
-                    : Icons.check_box_outline_blank,
+                selected ? Icons.check_box : Icons.check_box_outline_blank,
                 size: 20,
                 color: selected ? BrandColors.primaryBlue : Colors.grey,
               ),
@@ -1514,7 +1506,10 @@ class _RoleTermsSection extends StatelessWidget {
                 ' and ',
                 style: TextStyle(fontSize: 13, color: Color(0xFF424242)),
               ),
-              _linkText('Capital Locum data and privacy policy', privacyPolicyUrl),
+              _linkText(
+                'Capital Locum data and privacy policy',
+                privacyPolicyUrl,
+              ),
               const Text(
                 '.',
                 style: TextStyle(fontSize: 13, color: Color(0xFF424242)),
@@ -1602,12 +1597,14 @@ class _UkPhoneField extends StatelessWidget {
     required this.decoration,
     required this.radius,
     required this.border,
+    this.isRequired = true,
   });
 
   final TextEditingController controller;
   final InputDecoration Function(String hint) decoration;
   final double radius;
   final Color border;
+  final bool isRequired;
 
   static const _labelColor = Color(0xFF424242);
 
@@ -1646,7 +1643,7 @@ class _UkPhoneField extends StatelessWidget {
             ],
             validator: (v) {
               final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
-              if (digits.isEmpty) return 'Required';
+              if (digits.isEmpty) return isRequired ? 'Required' : null;
               if (digits.length < 9) return 'Enter a valid UK number';
               return null;
             },
@@ -1704,30 +1701,27 @@ class _ProfessionalReferencesSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        requiredLabel('Name', isRequired: true),
+        requiredLabel('Name', isRequired: false),
         TextFormField(
           controller: name,
           decoration: decoration(''),
-          validator: (v) =>
-              v == null || v.trim().isEmpty ? 'Required' : null,
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
-        requiredLabel('Phone number', isRequired: true),
+        requiredLabel('Phone number', isRequired: false),
         _UkPhoneField(
           controller: phone,
           decoration: decoration,
           radius: radius,
           border: border,
+          isRequired: false,
         ),
         const SizedBox(height: 12),
-        requiredLabel('Details', isRequired: true),
+        requiredLabel('Details', isRequired: false),
         TextFormField(
           controller: details,
           decoration: decoration(_detailsHint),
           maxLines: 3,
-          validator: (v) =>
-              v == null || v.trim().isEmpty ? 'Required' : null,
           textInputAction: TextInputAction.next,
         ),
       ],
@@ -1748,7 +1742,7 @@ class _ProfessionalReferencesSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Professional references',
+            'Professional references (optional)',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -1809,9 +1803,9 @@ class _RegisterHeader extends StatelessWidget {
         Text(
           'Register',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF37474F),
-              ),
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF37474F),
+          ),
           textAlign: TextAlign.center,
         ),
       ],
@@ -1853,33 +1847,24 @@ class _QualificationCertificatesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RichText(
-            text: const TextSpan(
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF424242),
-              ),
-              children: [
-                TextSpan(text: 'Qualification certificates'),
-                TextSpan(
-                  text: ' *',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
-                ),
-              ],
+          const Text(
+            'Qualification certificates (optional)',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF424242),
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'Add up to ${RegisterQualificationCerts.maxCount} files. '
-            'At least 1 required.',
+            'Add up to ${RegisterQualificationCerts.maxCount} files.',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
           ),
           const SizedBox(height: 16),
           if (certs.isEmpty)
             _DocUploadRow(
               label: 'Certificate 1',
-              isRequired: true,
+              isRequired: false,
               fileName: null,
               onChoose: onAdd,
               borderColor: borderColor,
@@ -1890,7 +1875,7 @@ class _QualificationCertificatesCard extends StatelessWidget {
               if (i > 0) const SizedBox(height: 12),
               _DocUploadRow(
                 label: 'Certificate ${i + 1}',
-                isRequired: i == 0,
+                isRequired: false,
                 fileName: certs[i].name,
                 onChoose: onAdd,
                 onClear: () => onRemove(i),
@@ -1957,7 +1942,7 @@ class _DocumentsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Locum documents',
+            'Locum documents (optional)',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -1973,10 +1958,7 @@ class _DocumentsCard extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 560;
-              return _docGrid(
-                context: context,
-                wide: wide,
-              );
+              return _docGrid(context: context, wide: wide);
             },
           ),
         ],
@@ -1984,24 +1966,21 @@ class _DocumentsCard extends StatelessWidget {
     );
   }
 
-  Widget _docGrid({
-    required BuildContext context,
-    required bool wide,
-  }) {
+  Widget _docGrid({required BuildContext context, required bool wide}) {
     final children = <Widget>[];
     for (final slot in docSlots) {
       children.add(
         _DocUploadRow(
-                label: slot.label,
-                isRequired: slot.isRequired,
-                fileName: docFiles[slot.index]?.name,
-                onChoose: () => onPick(slot.index),
-                onClear: docFiles[slot.index] != null
-                    ? () => onClear(slot.index)
-                    : null,
-                borderColor: borderColor,
-                radius: radius,
-              ),
+          label: slot.label,
+          isRequired: slot.isRequired,
+          fileName: docFiles[slot.index]?.name,
+          onChoose: () => onPick(slot.index),
+          onClear: docFiles[slot.index] != null
+              ? () => onClear(slot.index)
+              : null,
+          borderColor: borderColor,
+          radius: radius,
+        ),
       );
     }
 
@@ -2079,7 +2058,10 @@ class _DocUploadRow extends StatelessWidget {
               if (isRequired)
                 const TextSpan(
                   text: ' *',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
             ],
           ),
@@ -2099,7 +2081,10 @@ class _DocUploadRow extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: BrandColors.primaryBlue,
                   side: BorderSide(color: Colors.grey.shade400),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -2129,7 +2114,10 @@ class _DocUploadRow extends StatelessWidget {
                   ),
                   tooltip: 'Remove attachment',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
             ],

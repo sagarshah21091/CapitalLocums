@@ -19,27 +19,27 @@ class RegisterApi {
     required String lastName,
     required String email,
     required String password,
-    required String location,
-    required double latitude,
-    required double longitude,
-    required String phone,
+    String? location,
+    double? latitude,
+    double? longitude,
+    String? phone,
     required String qualifications,
     required int experienceYears,
     required String locumRole,
     required double travelDistanceMiles,
     String? gphcNumber,
-    required String address,
-    required String city,
-    required String zipCode,
+    String? address,
+    String? city,
+    String? zipCode,
     required String dateOfBirth,
     required String gender,
     required String qualificationDate,
     String? independentPrescriber,
     required bool agreedPharmacistTerms,
     required bool agreedPrivacyPolicy,
-    required XFile passport,
-    required XFile nationalInsurance,
-    required List<XFile> qualificationCertificates,
+    XFile? passport,
+    XFile? nationalInsurance,
+    List<XFile> qualificationCertificates = const [],
     required String professionalReference1Name,
     required String professionalReference1Phone,
     required String professionalReference1Details,
@@ -55,15 +55,24 @@ class RegisterApi {
       formData.fields.add(MapEntry(key, value));
     }
 
+    void addOptionalField(String key, String? value) {
+      final trimmed = value?.trim() ?? '';
+      if (trimmed.isNotEmpty) addField(key, trimmed);
+    }
+
     addField('name', name.trim());
     addField('last_name', lastName.trim());
     addField('email', email.trim());
     addField('password', password);
     addField('role', 'locum');
-    addField('location', location.trim());
-    addField('latitude', '$latitude');
-    addField('longitude', '$longitude');
-    addField('phone', phone.trim());
+    addOptionalField('location', location);
+    if (location?.trim().isNotEmpty == true &&
+        latitude != null &&
+        longitude != null) {
+      addField('latitude', '$latitude');
+      addField('longitude', '$longitude');
+    }
+    addOptionalField('phone', phone);
     addField('qualifications', qualifications.trim());
     addField('experience_years', '$experienceYears');
     addField('locum_role', locumRole.trim().toLowerCase());
@@ -72,9 +81,9 @@ class RegisterApi {
     if (gphc.isNotEmpty) {
       addField('gphc_number', gphc);
     }
-    addField('address', address.trim());
-    addField('city', city.trim());
-    addField('zip_code', zipCode.trim());
+    addOptionalField('address', address);
+    addOptionalField('city', city);
+    addOptionalField('zip_code', zipCode);
     addField('dob', dateOfBirth.trim());
     addField('gender', gender.trim().toLowerCase());
     addField('qualification_date', qualificationDate.trim());
@@ -102,11 +111,15 @@ class RegisterApi {
     }
 
     try {
-      await addFile('passport', passport);
+      if (passport != null) {
+        await addFile('passport', passport);
+      }
       if (visaWorkPermit != null) {
         await addFile('visa_work_permit', visaWorkPermit);
       }
-      await addFile('national_insurance', nationalInsurance);
+      if (nationalInsurance != null) {
+        await addFile('national_insurance', nationalInsurance);
+      }
       for (final cert in qualificationCertificates) {
         await addFile('qualification_certificates', cert);
       }
