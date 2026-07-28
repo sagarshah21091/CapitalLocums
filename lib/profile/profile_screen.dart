@@ -1,3 +1,5 @@
+import 'package:cross_file/cross_file.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,7 +69,10 @@ class _ProfileData {
   bool get isPharmacist => locumRole == 'Pharmacist';
 
   String get fullName {
-    final parts = [firstName.trim(), lastName.trim()].where((p) => p.isNotEmpty);
+    final parts = [
+      firstName.trim(),
+      lastName.trim(),
+    ].where((p) => p.isNotEmpty);
     return parts.join(' ');
   }
 }
@@ -89,6 +94,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late _ProfileData _saved;
   ProfileDetails? _serverProfile;
   List<ProfileDocument> _documents = [];
+  final Map<String, XFile> _selectedDocuments = {};
+  final Set<int> _deletingDocumentIds = {};
+  final Set<int> _downloadingDocumentIds = {};
+  final Set<String> _uploadingDocumentTypes = {};
 
   late final TextEditingController _firstNameController;
   late final TextEditingController _lastNameController;
@@ -118,6 +127,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   static const _genderOptions = ['Male', 'Female', 'Other'];
   static const _cardRadius = 12.0;
   static const _borderColor = Color(0xFFE0E0E0);
+  static const _profileDocumentTypes = [
+    'passport',
+    'visa_work_permit',
+    'national_insurance',
+    'qualification_certificates',
+    'dbs_check',
+  ];
 
   static const _emptyProfile = _ProfileData(
     firstName: '',
@@ -259,7 +275,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => controller.text = '$day/$month/${picked.year}');
   }
 
-  Widget _dateField(TextEditingController controller, {String hint = 'dd/mm/yyyy'}) {
+  Widget _dateField(
+    TextEditingController controller, {
+    String hint = 'dd/mm/yyyy',
+  }) {
     return TextField(
       controller: controller,
       readOnly: true,
@@ -295,7 +314,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final lng =
         double.tryParse(profile.longitude ?? '') ?? profile.coordinates?.x;
     if (lat == null || lng == null) return;
-    ref.read(registerLocationProvider.notifier).setPick(
+    ref
+        .read(registerLocationProvider.notifier)
+        .setPick(
           PickedRegisterLocation(
             latitude: lat,
             longitude: lng,
@@ -313,19 +334,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ProfileUser? user,
   }) {
     _serverProfile = profile;
-    final displayFirst = firstName ??
-        user?.name.trim() ??
-        _saved.firstName;
-    final displayLast = lastName ??
-        user?.lastName.trim() ??
-        _saved.lastName;
+    final displayFirst = firstName ?? user?.name.trim() ?? _saved.firstName;
+    final displayLast = lastName ?? user?.lastName.trim() ?? _saved.lastName;
     final displayEmail = email ?? _saved.email;
     final role = _displayLocumRole(profile.locumRole);
 
-    final address = _firstNonEmpty(
-      user?.address ?? '',
-      profile.address,
-    );
+    final address = _firstNonEmpty(user?.address ?? '', profile.address);
     final city = _firstNonEmpty(user?.city ?? '', profile.city);
     final zipCode = _firstNonEmpty(user?.zipCode ?? '', profile.zipCode);
     final dobRaw = _firstNonEmpty(user?.dob ?? '', profile.dob);
@@ -355,10 +369,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       zipCode: zipCode,
       dateOfBirth: ProfileDetails.formatDobForDisplay(dobRaw),
       gender: ProfileDetails.formatGender(genderRaw),
-      qualificationDate:
-          ProfileDetails.formatDobForDisplay(qualDateRaw),
-      independentPrescriber:
-          ProfileDetails.formatIndependentPrescriber(indepRaw),
+      qualificationDate: ProfileDetails.formatDobForDisplay(qualDateRaw),
+      independentPrescriber: ProfileDetails.formatIndependentPrescriber(
+        indepRaw,
+      ),
       refName1: user?.refName1.trim() ?? _saved.refName1,
       refPhone1: user?.refPhoneNumber1.trim() ?? _saved.refPhone1,
       refDetails1: user?.refDetails1.trim() ?? _saved.refDetails1,
@@ -388,14 +402,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _proRef2DetailsController.text = _saved.refDetails2;
     _locumRole = role;
     _gender = _saved.gender.isEmpty ? null : _saved.gender;
-    _independentPrescriber =
-        _independentFromDisplay(_saved.independentPrescriber);
+    _independentPrescriber = _independentFromDisplay(
+      _saved.independentPrescriber,
+    );
   }
 
   void _applyPayload(ProfilePayload payload) {
     final user = payload.user;
     final profile = payload.profile;
     _documents = List<ProfileDocument>.from(payload.documents);
+    _selectedDocuments.clear();
 
     if (profile != null) {
       _applyProfileDetails(
@@ -429,8 +445,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     var lng =
         double.tryParse(base.longitude ?? '') ?? base.coordinates?.x ?? 0.0;
 
-    if (picked != null &&
-        picked.formattedAddress.trim() == location.trim()) {
+    if (picked != null && picked.formattedAddress.trim() == location.trim()) {
       lat = picked.latitude;
       lng = picked.longitude;
     }
@@ -452,10 +467,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       zipCode: _zipCodeController.text.trim(),
       dob: ProfileDetails.dateToApi(_dobController.text),
       gender: (_gender ?? '').toLowerCase(),
-      qualificationDate:
-          ProfileDetails.dateToApi(_qualificationDateController.text),
-      independentPrescriber: _locumRole == 'Pharmacist' &&
-              _independentPrescriber != null
+      qualificationDate: ProfileDetails.dateToApi(
+        _qualificationDateController.text,
+      ),
+      independentPrescriber:
+          _locumRole == 'Pharmacist' && _independentPrescriber != null
           ? (_independentPrescriber! ? '1' : '0')
           : '',
       createdAt: base.createdAt,
@@ -472,12 +488,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     payload['name'] = _firstNameController.text.trim();
     payload['last_name'] = _lastNameController.text.trim();
     payload['ref_Name_1'] = _proRef1NameController.text.trim();
-    payload['ref_PhoneNumber_1'] =
-        _phoneForApiFromText(_proRef1PhoneController.text);
+    payload['ref_PhoneNumber_1'] = _phoneForApiFromText(
+      _proRef1PhoneController.text,
+    );
     payload['ref_Details_1'] = _proRef1DetailsController.text.trim();
     payload['ref_Name_2'] = _proRef2NameController.text.trim();
-    payload['ref_PhoneNumber_2'] =
-        _phoneForApiFromText(_proRef2PhoneController.text);
+    payload['ref_PhoneNumber_2'] = _phoneForApiFromText(
+      _proRef2PhoneController.text,
+    );
     payload['ref_Details_2'] = _proRef2DetailsController.text.trim();
     return payload;
   }
@@ -499,8 +517,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       _loadError = null;
     });
     try {
-      final payload =
-          await ref.read(profileRepositoryProvider).fetchProfile();
+      final payload = await ref.read(profileRepositoryProvider).fetchProfile();
       if (!mounted) return;
       setState(() {
         _applyPayload(payload);
@@ -578,9 +595,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (_saving || _serverProfile == null) return;
 
     if (_phoneController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Phone is required.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Phone is required.')));
       return;
     }
     if (_qualificationsController.text.trim().isEmpty) {
@@ -592,28 +609,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     final gphcError = _gphcValidationMessage();
     if (gphcError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(gphcError)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(gphcError)));
       return;
     }
 
     if (_firstNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('First name is required.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('First name is required.')));
       return;
     }
     if (_lastNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Last name is required.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Last name is required.')));
       return;
     }
     if (_gender == null || _gender!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select gender.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select gender.')));
       return;
     }
     if (_locumRole == 'Pharmacist' && _independentPrescriber == null) {
@@ -638,22 +655,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (AppEnv.googleMapsApiKey.isNotEmpty) {
       final locErr = _validateEditLocation(_locationController.text);
       if (locErr != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(locErr)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(locErr)));
         return;
       }
     } else if (_locationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Address is required.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Address is required.')));
       return;
     }
 
     setState(() => _saving = true);
     try {
-      final result =
-          await ref.read(profileRepositoryProvider).updateProfile(payload);
+      final result = await ref
+          .read(profileRepositoryProvider)
+          .updateProfile(payload);
       if (!mounted) return;
       final base = _serverProfile!;
       final updated = result.data!.mergeWith(base);
@@ -668,19 +686,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         zipCode: _zipCodeController.text.trim(),
         dob: ProfileDetails.dateToApi(_dobController.text),
         gender: _gender!.toLowerCase(),
-        qualificationDate:
-            ProfileDetails.dateToApi(_qualificationDateController.text),
-        independentPrescriber: _locumRole == 'Pharmacist' &&
-                _independentPrescriber != null
+        qualificationDate: ProfileDetails.dateToApi(
+          _qualificationDateController.text,
+        ),
+        independentPrescriber:
+            _locumRole == 'Pharmacist' && _independentPrescriber != null
             ? (_independentPrescriber! ? '1' : '0')
             : '',
         refName1: _proRef1NameController.text.trim(),
-        refPhoneNumber1:
-            _phoneForApiFromText(_proRef1PhoneController.text),
+        refPhoneNumber1: _phoneForApiFromText(_proRef1PhoneController.text),
         refDetails1: _proRef1DetailsController.text.trim(),
         refName2: _proRef2NameController.text.trim(),
-        refPhoneNumber2:
-            _phoneForApiFromText(_proRef2PhoneController.text),
+        refPhoneNumber2: _phoneForApiFromText(_proRef2PhoneController.text),
         refDetails2: _proRef2DetailsController.text.trim(),
       );
       _applyProfileDetails(
@@ -705,9 +722,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
     } on ProfileFailure catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -735,9 +752,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final uri = Uri.tryParse(url);
     if (uri == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid document link.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invalid document link.')));
       return;
     }
 
@@ -753,9 +770,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open document: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not open document: $e')));
     }
   }
 
@@ -825,6 +842,182 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  XFile? _xFileFromPlatformFile(PlatformFile file) {
+    final path = file.path?.trim() ?? '';
+    if (path.isNotEmpty) return XFile(path, name: file.name);
+    final bytes = file.bytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return XFile.fromData(bytes, name: file.name);
+    }
+    return null;
+  }
+
+  Future<void> _chooseDocument(String documentType) async {
+    try {
+      final result = await FilePicker.pickFiles(
+        allowMultiple: false,
+        type: FileType.any,
+        withData: true,
+      );
+      if (!mounted || result == null || result.files.isEmpty) return;
+      final file = _xFileFromPlatformFile(result.files.first);
+      if (file == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not read that file. Try another.'),
+          ),
+        );
+        return;
+      }
+      setState(() => _selectedDocuments[documentType] = file);
+    } on MissingPluginException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'File picker is unavailable. Restart the app and try again.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not choose document: $e')));
+    }
+  }
+
+  Future<void> _uploadSelectedDocument(String documentType) async {
+    final file = _selectedDocuments[documentType];
+    if (file == null || _uploadingDocumentTypes.contains(documentType)) return;
+
+    setState(() => _uploadingDocumentTypes.add(documentType));
+    try {
+      final result = await ref
+          .read(profileRepositoryProvider)
+          .uploadDocument(documentType: documentType, file: file);
+      if (!mounted) return;
+      setState(() {
+        _documents = List<ProfileDocument>.from(result.data);
+        _selectedDocuments.remove(documentType);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.message?.trim().isNotEmpty == true
+                ? result.message!.trim()
+                : 'Document uploaded successfully',
+          ),
+        ),
+      );
+    } on ProfileFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingDocumentTypes.remove(documentType));
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteDocument(ProfileDocument document) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete document'),
+        content: const Text(
+          'Are you sure ? You want to delete this document ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    await _deleteDocument(document);
+  }
+
+  Future<void> _deleteDocument(ProfileDocument document) async {
+    if (_deletingDocumentIds.contains(document.id)) return;
+    setState(() => _deletingDocumentIds.add(document.id));
+    try {
+      final result = await ref
+          .read(profileRepositoryProvider)
+          .deleteDocument(document.id);
+      if (!mounted) return;
+      setState(() => _documents = List<ProfileDocument>.from(result.data));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.message?.trim().isNotEmpty == true
+                ? result.message!.trim()
+                : 'Document deleted successfully',
+          ),
+        ),
+      );
+    } on ProfileFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _deletingDocumentIds.remove(document.id));
+    }
+  }
+
+  Future<void> _downloadDocument(ProfileDocument document) async {
+    if (_downloadingDocumentIds.contains(document.id)) return;
+    setState(() => _downloadingDocumentIds.add(document.id));
+    try {
+      final bytes = await ref
+          .read(profileRepositoryProvider)
+          .downloadDocument(document);
+      if (!mounted) return;
+      final path = await FilePicker.saveFile(
+        dialogTitle: 'Save ${document.displayTitle}',
+        fileName: document.documentName,
+        bytes: bytes,
+      );
+      if (!mounted || path == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Document downloaded successfully.')),
+      );
+    } on MissingPluginException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Download is unavailable. Restart the app and try again.',
+          ),
+        ),
+      );
+    } on ProfileFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not download document: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _downloadingDocumentIds.remove(document.id));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -882,6 +1075,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         padding: const EdgeInsets.all(16),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
+          if (_serverProfile?.approvalStatus.trim().toUpperCase() ==
+              'REJECTED') ...[
+            _rejectionReasonBanner(),
+            const SizedBox(height: 16),
+          ],
           _userHeaderCard(context),
           const SizedBox(height: 16),
           _personalDetailsCard(context),
@@ -908,6 +1106,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         border: Border.all(color: _borderColor),
       ),
       child: child,
+    );
+  }
+
+  Widget _rejectionReasonBanner() {
+    final reason = _serverProfile?.approvalReason?.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.red.shade700, width: 1.4),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade700),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              reason != null && reason.isNotEmpty
+                  ? reason
+                  : 'Your profile has been rejected. Please review your details and documents.',
+              style: TextStyle(
+                color: Colors.red.shade800,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1060,10 +1290,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ? _ProfileUkPhoneField(controller: _phoneController)
                 : Text(
                     _saved.phone.isEmpty ? '—' : _saved.phone,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.grey.shade800,
-                    ),
+                    style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   ),
           ),
           const SizedBox(height: 12),
@@ -1072,8 +1299,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Text(
               _editing
                   ? (_locationController.text.isEmpty
-                      ? 'Edit address below'
-                      : _locationController.text)
+                        ? 'Edit address below'
+                        : _locationController.text)
                   : (_saved.location.isEmpty ? '—' : _saved.location),
               style: TextStyle(
                 fontSize: 15,
@@ -1087,10 +1314,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _headerContactRow({
-    required IconData icon,
-    required Widget child,
-  }) {
+  Widget _headerContactRow({required IconData icon, required Widget child}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1111,10 +1335,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const SizedBox(width: 8),
         Text(
           text,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ],
     );
@@ -1205,9 +1426,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ? TextField(
                   controller: _experienceController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -1234,8 +1453,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 0,
+                    ),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -1330,10 +1551,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 16),
           _fieldLabel('Zip code'),
           _editing
-              ? _editableField(
-                  controller: _zipCodeController,
-                  hint: 'Postcode',
-                )
+              ? _editableField(controller: _zipCodeController, hint: 'Postcode')
               : _readOnlyValue(_saved.zipCode),
           const SizedBox(height: 16),
           _fieldLabel('Date of birth'),
@@ -1352,10 +1570,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       hint: const Text('Select gender'),
                       items: _genderOptions
                           .map(
-                            (e) => DropdownMenuItem(
-                              value: e,
-                              child: Text(e),
-                            ),
+                            (e) => DropdownMenuItem(value: e, child: Text(e)),
                           )
                           .toList(),
                       onChanged: (v) => setState(() => _gender = v),
@@ -1489,9 +1704,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ? TextField(
                   controller: _travelKmController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -1509,135 +1722,276 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _documentsCard(BuildContext context) {
     final count = _documents.length;
+    final documentWidgets = <Widget>[];
+    final types = _saved.isPharmacist
+        ? _profileDocumentTypes
+        : _profileDocumentTypes.where((type) => type != 'dbs_check');
+    final displayedIds = <int>{};
+    for (final type in types) {
+      final documents = _documents
+          .where(
+            (document) =>
+                document.docType == type ||
+                (type == 'qualification_certificates' &&
+                    document.docType == 'qualification_cert'),
+          )
+          .toList();
+      displayedIds.addAll(documents.map((document) => document.id));
+      documentWidgets.addAll(
+        documents.map((document) => _documentRow(context, document)),
+      );
+
+      final maxCount = type == 'qualification_certificates' ? 4 : 1;
+      if (documents.length < maxCount) {
+        documentWidgets.add(_emptyDocumentRow(type));
+      }
+    }
+    documentWidgets.addAll(
+      _documents
+          .where((document) => !displayedIds.contains(document.id))
+          .map((document) => _documentRow(context, document)),
+    );
+
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle(
-            Icons.description_outlined,
-            'Documents ($count)',
-          ),
+          _sectionTitle(Icons.description_outlined, 'Documents ($count)'),
           const SizedBox(height: 4),
           Text(
-            _editing
-                ? 'Documents cannot be changed here. Tap to preview only.'
-                : 'Tap images to preview; other files open externally',
+            'View, download, delete, or upload your registration documents.',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 12),
-          if (_documents.isEmpty)
-            Text(
-              'No documents on file.',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-            )
-          else
-            ...List<Widget>.generate(_documents.length, (i) {
-              final d = _documents[i];
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _documentRow(context, d),
-                  if (i < _documents.length - 1)
-                    Divider(height: 1, color: Colors.grey.shade200),
-                ],
-              );
-            }),
+          ...List<Widget>.generate(documentWidgets.length, (index) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                documentWidgets[index],
+                if (index < documentWidgets.length - 1)
+                  Divider(height: 1, color: Colors.grey.shade200),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyDocumentRow(String documentType) {
+    final selected = _selectedDocuments[documentType];
+    final uploading = _uploadingDocumentTypes.contains(documentType);
+    final title = ProfileDocument.titleForDocType(documentType);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.upload_file_outlined,
+                size: 28,
+                color: Colors.grey.shade600,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      selected?.name ?? 'No file selected',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (selected != null) ...[
+                TextButton(
+                  onPressed: uploading
+                      ? null
+                      : () => setState(
+                          () => _selectedDocuments.remove(documentType),
+                        ),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+              ],
+              FilledButton.icon(
+                onPressed: uploading
+                    ? null
+                    : selected == null
+                    ? () => _chooseDocument(documentType)
+                    : () => _uploadSelectedDocument(documentType),
+                icon: uploading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(
+                        selected == null
+                            ? Icons.attach_file
+                            : Icons.cloud_upload_outlined,
+                        size: 18,
+                      ),
+                label: Text(selected == null ? 'Choose file' : 'Upload Now'),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
   Widget _documentRow(BuildContext context, ProfileDocument doc) {
-    return InkWell(
-      onTap: () => _previewDocument(doc),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Icon(
-                Icons.circle,
-                size: 10,
-                color: Colors.orange.shade700,
+    final deleting = _deletingDocumentIds.contains(doc.id);
+    final downloading = _downloadingDocumentIds.contains(doc.id);
+    final busy = deleting || downloading;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(
+                  Icons.circle,
+                  size: 10,
+                  color: Colors.orange.shade700,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            if (_isPreviewableImage(doc.documentName))
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  ApiConstants.documentUrl(doc.documentName),
-                  width: 44,
-                  height: 44,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
+              const SizedBox(width: 12),
+              if (_isPreviewableImage(doc.documentName))
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    ApiConstants.documentUrl(doc.documentName),
                     width: 44,
                     height: 44,
-                    color: Colors.grey.shade200,
-                    child: Icon(Icons.broken_image_outlined,
-                        color: Colors.grey.shade500),
-                  ),
-                ),
-              )
-            else
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Icon(
-                  _documentIcon(doc.documentName),
-                  color: _isPdf(doc.documentName)
-                      ? Colors.red.shade700
-                      : Colors.grey.shade600,
-                ),
-              ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    doc.displayTitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      width: 44,
+                      height: 44,
+                      color: Colors.grey.shade200,
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.grey.shade500,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    doc.documentName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                )
+              else
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                ],
+                  child: Icon(
+                    _documentIcon(doc.documentName),
+                    color: _isPdf(doc.documentName)
+                        ? Colors.red.shade700
+                        : Colors.grey.shade600,
+                  ),
+                ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      doc.displayTitle,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      doc.documentName,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              onPressed: () => _previewDocument(doc),
-              icon: Icon(
-                Icons.visibility_outlined,
-                color: BrandColors.locumsGreen,
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              TextButton.icon(
+                onPressed: busy ? null : () => _previewDocument(doc),
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: const Text('View'),
               ),
-              tooltip: _isPreviewableImage(doc.documentName)
-                  ? 'Preview'
-                  : 'Open',
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
-        ),
+              TextButton.icon(
+                onPressed: busy ? null : () => _downloadDocument(doc),
+                icon: downloading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Download'),
+              ),
+              TextButton.icon(
+                onPressed: busy ? null : () => _confirmDeleteDocument(doc),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red.shade700,
+                ),
+                icon: deleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Delete'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1682,8 +2036,10 @@ class _ProfileUkPhoneField extends StatelessWidget {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
           ),
         ),
@@ -1717,9 +2073,7 @@ class _ProfileIndependentPrescriberField extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  selected
-                      ? Icons.check_box
-                      : Icons.check_box_outline_blank,
+                  selected ? Icons.check_box : Icons.check_box_outline_blank,
                   size: 20,
                   color: selected ? BrandColors.primaryBlue : Colors.grey,
                 ),

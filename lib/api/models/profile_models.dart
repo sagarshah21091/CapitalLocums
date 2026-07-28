@@ -398,6 +398,32 @@ class ProfileUpdateResponse {
   }
 }
 
+class ProfileDocumentsResponse {
+  const ProfileDocumentsResponse({
+    required this.success,
+    this.message,
+    this.data = const [],
+  });
+
+  final bool success;
+  final String? message;
+  final List<ProfileDocument> data;
+
+  factory ProfileDocumentsResponse.fromJson(Map<String, dynamic> json) {
+    final dataRaw = json['data'];
+    return ProfileDocumentsResponse(
+      success: json['success'] as bool? ?? false,
+      message: json['message']?.toString(),
+      data: dataRaw is List
+          ? dataRaw
+                .whereType<Map<String, dynamic>>()
+                .map(ProfileDocument.fromJson)
+                .toList()
+          : const [],
+    );
+  }
+}
+
 class ProfileDocument {
   const ProfileDocument({
     required this.id,
