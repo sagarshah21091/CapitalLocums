@@ -32,7 +32,9 @@ class AuthRepository {
       throw AuthFailure(e.message);
     }
 
-    if (!response.success || response.token == null || response.token!.isEmpty) {
+    if (!response.success ||
+        response.token == null ||
+        response.token!.isEmpty) {
       throw AuthFailure(
         response.message?.trim().isNotEmpty == true
             ? response.message!.trim()
@@ -85,6 +87,15 @@ class AuthRepository {
     return msg != null && msg.isNotEmpty
         ? msg
         : 'If email exists, reset link sent';
+  }
+
+  /// Permanently deletes the authenticated user's account.
+  Future<void> deleteAccount() async {
+    try {
+      await _api.deleteAccount();
+    } on AuthApiException catch (e) {
+      throw AuthFailure(e.message);
+    }
   }
 }
 

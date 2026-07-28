@@ -3,14 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../app_version.dart';
+import '../auth/auth_providers.dart';
 import '../auth/auth_session.dart';
 import '../router/app_router.dart';
 import '../shell/shell_user_header_provider.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+  @override
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _isDeletingAccount = false;
+
+  Future<void> _confirmDelete() async {
+    if (_isDeletingAccount) return;
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -32,12 +42,17 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     if (!context.mounted || ok != true) return;
-    await ref.read(authSessionProvider.notifier).logout();
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account deletion (demo only).')),
-    );
-    context.go(AppRoute.login);
+
+    setState(() => _isDeletingAccount = true);
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount();
+    } catch (_) {
+      // The requested fallback for any API failure is to log the user out.
+    } finally {
+      await ref.read(authSessionProvider.notifier).logout();
+      refreshShellUserHeader(ref);
+      if (mounted) context.go(AppRoute.login);
+    }
   }
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
@@ -66,10 +81,10 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final versionStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        );
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -113,7 +128,14 @@ class SettingsScreen extends ConsumerWidget {
                         'Delete account',
                         style: TextStyle(color: Colors.red.shade700),
                       ),
-                      onTap: () => _confirmDelete(context, ref),
+                      trailing: _isDeletingAccount
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : null,
+                      enabled: !_isDeletingAccount,
+                      onTap: _confirmDelete,
                     ),
                   ],
                 ),
