@@ -30,11 +30,7 @@ ProfileCoordinates? _parseCoordinates(dynamic raw) {
 }
 
 class ProfileResponse {
-  const ProfileResponse({
-    required this.success,
-    this.data,
-    this.message,
-  });
+  const ProfileResponse({required this.success, this.data, this.message});
 
   final bool success;
   final ProfilePayload? data;
@@ -53,11 +49,7 @@ class ProfileResponse {
 }
 
 class ProfilePayload {
-  const ProfilePayload({
-    this.user,
-    this.profile,
-    this.documents = const [],
-  });
+  const ProfilePayload({this.user, this.profile, this.documents = const []});
 
   final ProfileUser? user;
   final ProfileDetails? profile;
@@ -74,9 +66,9 @@ class ProfilePayload {
           : null,
       documents: docs is List
           ? docs
-              .whereType<Map<String, dynamic>>()
-              .map(ProfileDocument.fromJson)
-              .toList()
+                .whereType<Map<String, dynamic>>()
+                .map(ProfileDocument.fromJson)
+                .toList()
           : const [],
     );
   }
@@ -141,8 +133,7 @@ class ProfileUser {
       dob: json['dob'] as String? ?? json['date_of_birth'] as String? ?? '',
       gender: json['gender'] as String? ?? '',
       qualificationDate: json['qualification_date'] as String? ?? '',
-      independentPrescriber:
-          json['independent_prescriber']?.toString() ?? '',
+      independentPrescriber: json['independent_prescriber']?.toString() ?? '',
       refName1: json['ref_Name_1'] as String? ?? '',
       refPhoneNumber1: json['ref_PhoneNumber_1'] as String? ?? '',
       refDetails1: json['ref_Details_1'] as String? ?? '',
@@ -192,6 +183,8 @@ class ProfileDetails {
     this.gender = '',
     this.qualificationDate = '',
     this.independentPrescriber = '',
+    this.approvalStatus = '',
+    this.approvalReason,
     this.createdAt,
     this.updatedAt,
     this.coordinates,
@@ -215,6 +208,8 @@ class ProfileDetails {
   final String gender;
   final String qualificationDate;
   final String independentPrescriber;
+  final String approvalStatus;
+  final String? approvalReason;
   final String? createdAt;
   final String? updatedAt;
   final ProfileCoordinates? coordinates;
@@ -303,8 +298,9 @@ class ProfileDetails {
       dob: json['dob']?.toString() ?? json['date_of_birth']?.toString() ?? '',
       gender: json['gender'] as String? ?? '',
       qualificationDate: json['qualification_date']?.toString() ?? '',
-      independentPrescriber:
-          json['independent_prescriber']?.toString() ?? '',
+      independentPrescriber: json['independent_prescriber']?.toString() ?? '',
+      approvalStatus: json['approval_status']?.toString() ?? '',
+      approvalReason: json['approval_reason']?.toString(),
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
       coordinates: _parseCoordinates(json['coordinates']),
@@ -321,12 +317,15 @@ class ProfileDetails {
       userId: userId != 0 ? userId : base.userId,
       phone: pick(phone, base.phone),
       qualifications: pick(qualifications, base.qualifications),
-      experienceYears:
-          experienceYears != 0 ? experienceYears : base.experienceYears,
+      experienceYears: experienceYears != 0
+          ? experienceYears
+          : base.experienceYears,
       location: pick(location, base.location),
       latitude: latitude ?? base.latitude,
       longitude: longitude ?? base.longitude,
-      travelDistance: travelDistance != 0 ? travelDistance : base.travelDistance,
+      travelDistance: travelDistance != 0
+          ? travelDistance
+          : base.travelDistance,
       locumRole: locumRole ?? base.locumRole,
       gphcNumber: pick(gphcNumber, base.gphcNumber),
       address: pick(address, base.address),
@@ -335,8 +334,12 @@ class ProfileDetails {
       dob: pick(dob, base.dob),
       gender: pick(gender, base.gender),
       qualificationDate: pick(qualificationDate, base.qualificationDate),
-      independentPrescriber:
-          pick(independentPrescriber, base.independentPrescriber),
+      independentPrescriber: pick(
+        independentPrescriber,
+        base.independentPrescriber,
+      ),
+      approvalStatus: pick(approvalStatus, base.approvalStatus),
+      approvalReason: approvalReason ?? base.approvalReason,
       createdAt: createdAt ?? base.createdAt,
       updatedAt: updatedAt ?? base.updatedAt,
       coordinates: coordinates ?? base.coordinates,
@@ -377,11 +380,7 @@ class ProfileDetails {
 }
 
 class ProfileUpdateResponse {
-  const ProfileUpdateResponse({
-    required this.success,
-    this.message,
-    this.data,
-  });
+  const ProfileUpdateResponse({required this.success, this.message, this.data});
 
   final bool success;
   final String? message;

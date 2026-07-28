@@ -6,7 +6,7 @@ import '../shifts/shifts_providers.dart';
 import 'shell_user_header_provider.dart';
 
 /// Hosts [StatefulNavigationShell]: AppBar, tab body, bottom [NavigationBar].
-class MainShellScreen extends ConsumerWidget {
+class MainShellScreen extends ConsumerStatefulWidget {
   const MainShellScreen({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
@@ -16,35 +16,81 @@ class MainShellScreen extends ConsumerWidget {
   static const _titleNavy = Color(0xFF1A2B3C);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final index = navigationShell.currentIndex;
+  ConsumerState<MainShellScreen> createState() => _MainShellScreenState();
+}
+
+class _MainShellScreenState extends ConsumerState<MainShellScreen> {
+  bool _rejectionDialogShown = false;
+
+  void _showRejectionDialog(ShellUserHeader header) {
+    if (_rejectionDialogShown ||
+        header.approvalStatus.trim().toUpperCase() != 'REJECTED') {
+      return;
+    }
+
+    _rejectionDialogShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      final reason = header.approvalReason?.trim();
+      final acknowledged = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Profile rejected'),
+          content: Text(
+            reason != null && reason.isNotEmpty
+                ? reason
+                : 'Your profile has been rejected. Please review your profile details.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+
+      if (mounted && acknowledged == true) context.push('/profile');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final index = widget.navigationShell.currentIndex;
     final headerAsync = ref.watch(shellUserHeaderProvider);
+    headerAsync.whenData(_showRejectionDialog);
 
     return Scaffold(
-      backgroundColor: index == 0 || index == 1 ? _shellBg : null,
+      backgroundColor: index == 0 || index == 1
+          ? MainShellScreen._shellBg
+          : null,
       appBar: AppBar(
         toolbarHeight: 64,
         title: headerAsync.when(
           data: (header) => _AppBarUserHeader(header: header),
           loading: () => Text(
-            _titles[index],
+            MainShellScreen._titles[index],
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: _titleNavy,
+              color: MainShellScreen._titleNavy,
             ),
           ),
           error: (_, _) => Text(
-            _titles[index],
+            MainShellScreen._titles[index],
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: _titleNavy,
+              color: MainShellScreen._titleNavy,
             ),
           ),
         ),
         centerTitle: false,
-        backgroundColor: index == 0 || index == 1 ? _shellBg : null,
+        backgroundColor: index == 0 || index == 1
+            ? MainShellScreen._shellBg
+            : null,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         actions: [
@@ -58,10 +104,10 @@ class MainShellScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: navigationShell,
+      body: widget.navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
-        onDestinationSelected: navigationShell.goBranch,
+        onDestinationSelected: widget.navigationShell.goBranch,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),

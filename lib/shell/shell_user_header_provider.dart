@@ -14,10 +14,14 @@ class ShellUserHeader {
   const ShellUserHeader({
     required this.name,
     required this.yourRole,
+    this.approvalStatus = '',
+    this.approvalReason,
   });
 
   final String name;
   final String yourRole;
+  final String approvalStatus;
+  final String? approvalReason;
 }
 
 String _formatLocumRole(String? apiRole) {
@@ -30,8 +34,9 @@ String _formatLocumRole(String? apiRole) {
 }
 
 /// Refetches when [authSessionProvider] changes (login / logout).
-final shellUserHeaderProvider =
-    FutureProvider.autoDispose<ShellUserHeader>((ref) async {
+final shellUserHeaderProvider = FutureProvider.autoDispose<ShellUserHeader>((
+  ref,
+) async {
   final authStatus = ref.watch(authSessionProvider);
   if (authStatus != AuthSessionStatus.authenticated) {
     return const ShellUserHeader(name: '', yourRole: '');
@@ -46,6 +51,8 @@ final shellUserHeaderProvider =
         return full.isNotEmpty ? full : 'Locum';
       }(),
       yourRole: _formatLocumRole(payload.profile?.locumRole),
+      approvalStatus: payload.profile?.approvalStatus ?? '',
+      approvalReason: payload.profile?.approvalReason,
     );
   } on ProfileFailure {
     return const ShellUserHeader(name: 'Locum', yourRole: '—');
