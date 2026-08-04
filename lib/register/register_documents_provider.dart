@@ -7,7 +7,7 @@ abstract final class RegisterDocSlot {
 
   static const passport = 0;
   static const visaWorkPermit = 1;
-  static const nationalInsurance = 2;
+  static const safeguardingLevel2 = 2;
   static const dbsCheck = 3;
 
   static const count = 4;
@@ -31,6 +31,4 @@ class RegisterDocuments extends Notifier<List<XFile?>> {
 }
 
 final registerDocumentsProvider =
-    NotifierProvider<RegisterDocuments, List<XFile?>>(
-  RegisterDocuments.new,
-);
+    NotifierProvider<RegisterDocuments, List<XFile?>>(RegisterDocuments.new);

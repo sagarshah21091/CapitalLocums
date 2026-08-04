@@ -9,8 +9,7 @@ import 'register_attachment_prepare.dart';
 /// POST `/auth/register` — `multipart/form-data` per API schema.
 class RegisterApi {
   RegisterApi({Dio? dio})
-      : _dio = dio ??
-            createAppDio(receiveTimeout: const Duration(seconds: 120));
+    : _dio = dio ?? createAppDio(receiveTimeout: const Duration(seconds: 120));
 
   final Dio _dio;
 
@@ -28,6 +27,7 @@ class RegisterApi {
     required String locumRole,
     required double travelDistanceMiles,
     String? gphcNumber,
+    required String nationalInsuranceNumber,
     String? address,
     String? city,
     String? zipCode,
@@ -38,7 +38,7 @@ class RegisterApi {
     required bool agreedPharmacistTerms,
     required bool agreedPrivacyPolicy,
     XFile? passport,
-    XFile? nationalInsurance,
+    XFile? safeguardingLevel2,
     List<XFile> qualificationCertificates = const [],
     required String professionalReference1Name,
     required String professionalReference1Phone,
@@ -81,29 +81,25 @@ class RegisterApi {
     if (gphc.isNotEmpty) {
       addField('gphc_number', gphc);
     }
+    addField('national_insurance_number', nationalInsuranceNumber.trim());
     addOptionalField('address', address);
     addOptionalField('city', city);
     addOptionalField('zip_code', zipCode);
     addField('dob', dateOfBirth.trim());
     addField('gender', gender.trim().toLowerCase());
     addField('qualification_date', qualificationDate.trim());
-    if (independentPrescriber != null && independentPrescriber.trim().isNotEmpty) {
+    if (independentPrescriber != null &&
+        independentPrescriber.trim().isNotEmpty) {
       addField('independent_prescriber', independentPrescriber.trim());
     }
     // addField('agreed_pharmacist_terms', agreedPharmacistTerms ? 'true' : 'false');
     // addField('agreed_privacy_policy', agreedPrivacyPolicy ? 'true' : 'false');
     addField('ref_Name_1', professionalReference1Name.trim());
     addField('ref_PhoneNumber_1', professionalReference1Phone.trim());
-    addField(
-      'ref_Details_1',
-      professionalReference1Details.trim(),
-    );
+    addField('ref_Details_1', professionalReference1Details.trim());
     addField('ref_Name_2', professionalReference2Name.trim());
     addField('ref_PhoneNumber_2', professionalReference2Phone.trim());
-    addField(
-      'ref_Details_2',
-      professionalReference2Details.trim(),
-    );
+    addField('ref_Details_2', professionalReference2Details.trim());
 
     Future<void> addFile(String field, XFile file) async {
       final prepared = await prepareRegisterAttachmentForUpload(file);
@@ -117,8 +113,8 @@ class RegisterApi {
       if (visaWorkPermit != null) {
         await addFile('visa_work_permit', visaWorkPermit);
       }
-      if (nationalInsurance != null) {
-        await addFile('national_insurance', nationalInsurance);
+      if (safeguardingLevel2 != null) {
+        await addFile('safeguarding_level_2', safeguardingLevel2);
       }
       for (final cert in qualificationCertificates) {
         await addFile('qualification_certificates', cert);

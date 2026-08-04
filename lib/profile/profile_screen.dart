@@ -27,6 +27,7 @@ class _ProfileData {
     required this.locumRole,
     required this.travelMiles,
     required this.gphcNumber,
+    required this.nationalInsuranceNumber,
     required this.address,
     required this.city,
     required this.zipCode,
@@ -52,6 +53,7 @@ class _ProfileData {
   final String locumRole;
   final String travelMiles;
   final String gphcNumber;
+  final String nationalInsuranceNumber;
   final String address;
   final String city;
   final String zipCode;
@@ -107,6 +109,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late final TextEditingController _experienceController;
   late final TextEditingController _travelKmController;
   late final TextEditingController _gphcController;
+  late final TextEditingController _nationalInsuranceNumberController;
   late final TextEditingController _addressController;
   late final TextEditingController _cityController;
   late final TextEditingController _zipCodeController;
@@ -130,9 +133,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   static const _profileDocumentTypes = [
     'passport',
     'visa_work_permit',
-    'national_insurance',
-    'qualification_certificates',
+    'safeguarding_level_2',
     'dbs_check',
+    'qualification_certificates',
   ];
 
   static const _emptyProfile = _ProfileData(
@@ -146,6 +149,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     locumRole: 'Pharmacist',
     travelMiles: '',
     gphcNumber: '',
+    nationalInsuranceNumber: '',
     address: '',
     city: '',
     zipCode: '',
@@ -179,6 +183,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _experienceController = TextEditingController();
     _travelKmController = TextEditingController();
     _gphcController = TextEditingController();
+    _nationalInsuranceNumberController = TextEditingController();
     _addressController = TextEditingController();
     _cityController = TextEditingController();
     _zipCodeController = TextEditingController();
@@ -352,6 +357,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       user?.independentPrescriber ?? '',
       profile.independentPrescriber,
     );
+    final nationalInsuranceNumber = _firstNonEmpty(
+      user?.nationalInsuranceNumber ?? '',
+      profile.nationalInsuranceNumber,
+    );
 
     _saved = _ProfileData(
       firstName: displayFirst,
@@ -364,6 +373,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       locumRole: role,
       travelMiles: '${profile.travelDistance}',
       gphcNumber: profile.gphcNumber.trim(),
+      nationalInsuranceNumber: nationalInsuranceNumber,
       address: address,
       city: city,
       zipCode: zipCode,
@@ -389,6 +399,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _experienceController.text = _saved.experienceYears;
     _travelKmController.text = _saved.travelMiles;
     _gphcController.text = _saved.gphcNumber;
+    _nationalInsuranceNumberController.text = _saved.nationalInsuranceNumber;
     _addressController.text = _saved.address;
     _cityController.text = _saved.city;
     _zipCodeController.text = _saved.zipCode;
@@ -462,6 +473,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       travelDistance: travel,
       locumRole: _apiLocumRole(_locumRole),
       gphcNumber: _gphcController.text.trim(),
+      nationalInsuranceNumber: _nationalInsuranceNumberController.text.trim(),
       address: _addressController.text.trim(),
       city: _cityController.text.trim(),
       zipCode: _zipCodeController.text.trim(),
@@ -553,6 +565,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _experienceController.dispose();
     _travelKmController.dispose();
     _gphcController.dispose();
+    _nationalInsuranceNumberController.dispose();
     _addressController.dispose();
     _cityController.dispose();
     _zipCodeController.dispose();
@@ -594,12 +607,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _saveEdit() async {
     if (_saving || _serverProfile == null) return;
 
-    if (_phoneController.text.trim().isEmpty) {
+    /*if (_phoneController.text.trim().isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Phone is required.')));
       return;
-    }
+    }*/
     if (_qualificationsController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Qualifications are required.')),
@@ -612,6 +625,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(gphcError)));
+      return;
+    }
+
+    if (_nationalInsuranceNumberController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('National Insurance Number is required.')),
+      );
       return;
     }
 
@@ -693,6 +713,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _locumRole == 'Pharmacist' && _independentPrescriber != null
             ? (_independentPrescriber! ? '1' : '0')
             : '',
+        nationalInsuranceNumber: _nationalInsuranceNumberController.text.trim(),
         refName1: _proRef1NameController.text.trim(),
         refPhoneNumber1: _phoneForApiFromText(_proRef1PhoneController.text),
         refDetails1: _proRef1DetailsController.text.trim(),
@@ -1189,7 +1210,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ],
           ),
-          const SizedBox(height: 4),
+          /*const SizedBox(height: 4),
           Center(
             child: Container(
               padding: const EdgeInsets.all(3),
@@ -1217,7 +1238,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
             ),
-          ),
+          ),*/
           const SizedBox(height: 14),
           _editing
               ? Column(
@@ -1508,6 +1529,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 )
               : _readOnlyValue(_saved.gphcNumber),
+          const SizedBox(height: 16),
+          _fieldLabel(
+            'National Insurance Number',
+            preserveCase: true,
+            isRequired: true,
+          ),
+          _editing
+              ? _editableField(
+                  controller: _nationalInsuranceNumberController,
+                  hint: 'Enter National Insurance Number',
+                )
+              : _readOnlyValue(_saved.nationalInsuranceNumber),
           const SizedBox(height: 16),
           _fieldLabel('Qualification date'),
           _editing

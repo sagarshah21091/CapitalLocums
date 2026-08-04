@@ -39,6 +39,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _experienceController = TextEditingController();
   final _travelMilesController = TextEditingController();
   final _gphcController = TextEditingController();
+  final _nationalInsuranceNumberController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
   final _zipCodeController = TextEditingController();
@@ -58,6 +59,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool? _independentPrescriber;
   bool _agreedRoleTc = false;
   bool _agreedPrivacyPolicy = false;
+  bool _ir35Compliant = false;
 
   static const _genderOptions = ['Male', 'Female', 'Other'];
   static const _pharmacistTcUrl =
@@ -126,8 +128,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         isRequired: false,
       ),
       (
-        index: RegisterDocSlot.nationalInsurance,
-        label: 'National insurance',
+        index: RegisterDocSlot.safeguardingLevel2,
+        label: 'Safeguarding level 2',
         isRequired: false,
       ),
       if (isPharmacist)
@@ -188,6 +190,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _experienceController.dispose();
     _travelMilesController.dispose();
     _gphcController.dispose();
+    _nationalInsuranceNumberController.dispose();
     _addressController.dispose();
     _cityController.dispose();
     _zipCodeController.dispose();
@@ -616,6 +619,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             gphcNumber: _gphcController.text.trim().isEmpty
                 ? null
                 : _gphcController.text.trim(),
+            nationalInsuranceNumber: _nationalInsuranceNumberController.text
+                .trim(),
             address: _addressController.text,
             city: _cityController.text,
             zipCode: _zipCodeController.text,
@@ -630,7 +635,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             agreedPharmacistTerms: _agreedRoleTc,
             agreedPrivacyPolicy: _agreedPrivacyPolicy,
             passport: docs[RegisterDocSlot.passport],
-            nationalInsurance: docs[RegisterDocSlot.nationalInsurance],
+            safeguardingLevel2: docs[RegisterDocSlot.safeguardingLevel2],
             qualificationCertificates: qualCerts,
             professionalReference1Name: _proRef1NameController.text,
             professionalReference1Phone: _phoneForApiFromText(
@@ -971,6 +976,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    _requiredLabel(
+                      'National Insurance Number',
+                      isRequired: true,
+                      uppercase: false,
+                    ),
+                    TextFormField(
+                      controller: _nationalInsuranceNumberController,
+                      decoration: _decoration(
+                        'Enter National Insurance Number',
+                      ),
+                      textCapitalization: TextCapitalization.characters,
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 16),
                     _requiredLabel('Date of birth', isRequired: true),
                     _dateField(
                       controller: _dateOfBirthController,
@@ -1152,6 +1173,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 28),
+                    FormField<bool>(
+                      initialValue: _ir35Compliant,
+                      validator: (value) => value == true
+                          ? null
+                          : 'Please confirm that you are IR35 compliant',
+                      builder: (field) {
+                        return _Ir35ComplianceSection(
+                          value: field.value ?? false,
+                          onChanged: (value) {
+                            field.didChange(value);
+                            setState(() => _ir35Compliant = value);
+                          },
+                          hasError: field.hasError,
+                          errorText: field.errorText,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
                     FormField<void>(
                       validator: (_) => _validateTermsAgreements(),
                       builder: (field) {
@@ -1378,6 +1417,107 @@ class _IndependentPrescriberField extends StatelessWidget {
           onTap: () => onChanged(false),
         ),
       ],
+    );
+  }
+}
+
+class _Ir35ComplianceSection extends StatelessWidget {
+  const _Ir35ComplianceSection({
+    required this.value,
+    required this.onChanged,
+    required this.hasError,
+    this.errorText,
+  });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final bool hasError;
+  final String? errorText;
+
+  static const _border = Color(0xFFE0E0E0);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasError ? Colors.red.shade700 : _border,
+          width: hasError ? 1.4 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text.rich(
+            TextSpan(
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF424242),
+              ),
+              children: [
+                TextSpan(text: 'IR35 compliance'),
+                TextSpan(
+                  text: ' *',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _border),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Checkbox(
+                  value: value,
+                  onChanged: (checked) => onChanged(checked ?? false),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 4),
+                const Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      style: TextStyle(fontSize: 13, height: 1.35),
+                      children: [
+                        TextSpan(
+                          text:
+                              'I confirm that I am IR35 compliant and responsible for my own Tax and National Insurance Contributions.',
+                        ),
+                        TextSpan(
+                          text: ' *',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (errorText != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              errorText!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

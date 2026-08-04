@@ -88,6 +88,7 @@ class ProfileUser {
     this.gender = '',
     this.qualificationDate = '',
     this.independentPrescriber = '',
+    this.nationalInsuranceNumber = '',
     this.refName1 = '',
     this.refPhoneNumber1 = '',
     this.refDetails1 = '',
@@ -108,6 +109,7 @@ class ProfileUser {
   final String gender;
   final String qualificationDate;
   final String independentPrescriber;
+  final String nationalInsuranceNumber;
   final String refName1;
   final String refPhoneNumber1;
   final String refDetails1;
@@ -134,6 +136,8 @@ class ProfileUser {
       gender: json['gender'] as String? ?? '',
       qualificationDate: json['qualification_date'] as String? ?? '',
       independentPrescriber: json['independent_prescriber']?.toString() ?? '',
+      nationalInsuranceNumber:
+          json['national_insurance_number']?.toString() ?? '',
       refName1: json['ref_Name_1'] as String? ?? '',
       refPhoneNumber1: json['ref_PhoneNumber_1'] as String? ?? '',
       refDetails1: json['ref_Details_1'] as String? ?? '',
@@ -176,6 +180,7 @@ class ProfileDetails {
     required this.travelDistance,
     this.locumRole,
     this.gphcNumber = '',
+    this.nationalInsuranceNumber = '',
     this.address = '',
     this.city = '',
     this.zipCode = '',
@@ -201,6 +206,7 @@ class ProfileDetails {
   final num travelDistance;
   final String? locumRole;
   final String gphcNumber;
+  final String nationalInsuranceNumber;
   final String address;
   final String city;
   final String zipCode;
@@ -292,6 +298,8 @@ class ProfileDetails {
       travelDistance: _jsonNum(json['travel_distance']),
       locumRole: json['locum_role'] as String?,
       gphcNumber: json['gphc_number'] as String? ?? '',
+      nationalInsuranceNumber:
+          json['national_insurance_number']?.toString() ?? '',
       address: json['address'] as String? ?? '',
       city: json['city'] as String? ?? '',
       zipCode: json['zip_code'] as String? ?? '',
@@ -328,6 +336,10 @@ class ProfileDetails {
           : base.travelDistance,
       locumRole: locumRole ?? base.locumRole,
       gphcNumber: pick(gphcNumber, base.gphcNumber),
+      nationalInsuranceNumber: pick(
+        nationalInsuranceNumber,
+        base.nationalInsuranceNumber,
+      ),
       address: pick(address, base.address),
       city: pick(city, base.city),
       zipCode: pick(zipCode, base.zipCode),
@@ -365,6 +377,7 @@ class ProfileDetails {
       if (updatedAt != null) 'updated_at': updatedAt,
       'locum_role': locumRole,
       'gphc_number': gphcNumber,
+      'national_insurance_number': nationalInsuranceNumber.trim(),
       if (address.trim().isNotEmpty) 'address': address.trim(),
       if (city.trim().isNotEmpty) 'city': city.trim(),
       if (zipCode.trim().isNotEmpty) 'zip_code': zipCode.trim(),
@@ -454,8 +467,8 @@ class ProfileDocument {
         return 'Passport';
       case 'visa_work_permit':
         return 'Visa/Work permit';
-      case 'national_insurance':
-        return 'National insurance';
+      case 'safeguarding_level_2':
+        return 'Safeguarding level 2';
       case 'qualification_certificates':
         return 'Qualification certificates';
       case 'qualification_cert':
