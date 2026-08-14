@@ -823,7 +823,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       right: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _requiredLabel('Zip code', isRequired: false),
+                          _requiredLabel('Postcode', isRequired: false),
                           TextFormField(
                             controller: _zipCodeController,
                             decoration: _decoration('Postcode'),

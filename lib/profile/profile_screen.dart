@@ -1582,7 +1582,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ? _editableField(controller: _cityController, hint: 'City')
               : _readOnlyValue(_saved.city),
           const SizedBox(height: 16),
-          _fieldLabel('Zip code'),
+          _fieldLabel('Postcode'),
           _editing
               ? _editableField(controller: _zipCodeController, hint: 'Postcode')
               : _readOnlyValue(_saved.zipCode),
