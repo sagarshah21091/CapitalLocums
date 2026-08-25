@@ -311,6 +311,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   bool get _isPharmacist => _yourRole == 'Pharmacist';
 
+  bool get _isGphcRequired =>
+      _yourRole == 'Pharmacist' || _yourRole == 'Technician';
+
   String _formatDdMmYyyy(DateTime d) {
     final day = d.day.toString().padLeft(2, '0');
     final month = d.month.toString().padLeft(2, '0');
@@ -948,7 +951,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         children: [
                           _requiredLabel(
                             'GPhC number (7 digits)',
-                            isRequired: _isPharmacist,
+                            isRequired: _isGphcRequired,
                             uppercase: false,
                           ),
                           TextFormField(
@@ -963,7 +966,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             validator: (v) {
                               final t = v?.trim() ?? '';
                               if (t.isEmpty) {
-                                return _isPharmacist ? 'Required' : null;
+                                return _isGphcRequired ? 'Required' : null;
                               }
                               if (t.length != 7) {
                                 return 'Enter exactly 7 digits';
@@ -1623,12 +1626,20 @@ class _RoleTermsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            config.sectionTitle,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF424242),
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF424242),
+              ),
+              children: [
+                TextSpan(text: config.sectionTitle),
+                const TextSpan(
+                  text: ' *',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 10),

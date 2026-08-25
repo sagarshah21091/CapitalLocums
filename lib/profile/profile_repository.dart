@@ -26,7 +26,8 @@ class ProfileRepository {
             : 'Could not load profile.',
       );
     }
-    return response.data!;
+    final data = response.data!;
+    return data.withMessage(response.message ?? data.message);
   }
 
   Future<ProfileUpdateResponse> updateProfile(Map<String, dynamic> body) async {

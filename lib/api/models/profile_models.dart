@@ -49,11 +49,17 @@ class ProfileResponse {
 }
 
 class ProfilePayload {
-  const ProfilePayload({this.user, this.profile, this.documents = const []});
+  const ProfilePayload({
+    this.user,
+    this.profile,
+    this.documents = const [],
+    this.message,
+  });
 
   final ProfileUser? user;
   final ProfileDetails? profile;
   final List<ProfileDocument> documents;
+  final String? message;
 
   factory ProfilePayload.fromJson(Map<String, dynamic> json) {
     final docs = json['documents'];
@@ -70,6 +76,16 @@ class ProfilePayload {
                 .map(ProfileDocument.fromJson)
                 .toList()
           : const [],
+      message: json['message']?.toString(),
+    );
+  }
+
+  ProfilePayload withMessage(String? value) {
+    return ProfilePayload(
+      user: user,
+      profile: profile,
+      documents: documents,
+      message: value,
     );
   }
 }

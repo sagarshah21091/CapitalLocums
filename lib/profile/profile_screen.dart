@@ -95,6 +95,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   late _ProfileData _saved;
   ProfileDetails? _serverProfile;
+  String? _profileMessage;
   List<ProfileDocument> _documents = [];
   final Map<String, XFile> _selectedDocuments = {};
   final Set<int> _deletingDocumentIds = {};
@@ -243,11 +244,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool get _isPharmacistRole =>
       _editing ? _locumRole == 'Pharmacist' : _saved.isPharmacist;
 
-  /// Required for Pharmacist; optional for Technician/Dispenser. If set, must be 7 digits.
+  bool get _isGphcRequired =>
+      _locumRole == 'Pharmacist' || _locumRole == 'Technician';
+
+  /// Required for Pharmacist/Technician; optional for Dispenser. If set, must be 7 digits.
   String? _gphcValidationMessage() {
     final t = _gphcController.text.trim();
     if (t.isEmpty) {
-      return _locumRole == 'Pharmacist' ? 'Required' : null;
+      return _isGphcRequired ? 'GPhC Required' : null;
     }
     if (t.length != 7) {
       return 'Enter exactly 7 digits';
@@ -421,6 +425,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _applyPayload(ProfilePayload payload) {
     final user = payload.user;
     final profile = payload.profile;
+    _profileMessage = payload.message;
     _documents = List<ProfileDocument>.from(payload.documents);
     _selectedDocuments.clear();
 
@@ -689,9 +694,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     setState(() => _saving = true);
     try {
-      final result = await ref
-          .read(profileRepositoryProvider)
-          .updateProfile(payload);
+      final repository = ref.read(profileRepositoryProvider);
+      final result = await repository.updateProfile(payload);
       if (!mounted) return;
       final base = _serverProfile!;
       final updated = result.data!.mergeWith(base);
@@ -730,6 +734,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
       ref.read(registerLocationProvider.notifier).clear();
       _seedLocationFromProfile(updated);
+
+      String? refreshError;
+      try {
+        final refreshedPayload = await repository.fetchProfile();
+        if (!mounted) return;
+        _applyPayload(refreshedPayload);
+      } on ProfileFailure catch (e) {
+        refreshError = e.message;
+      } catch (e) {
+        refreshError = e.toString();
+      }
+      if (!mounted) return;
+
       refreshShellUserHeader(ref);
       setState(() => _editing = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -741,6 +758,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
       );
+      if (refreshError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Profile updated, but the refreshed values could not be loaded: $refreshError',
+            ),
+          ),
+        );
+      }
     } on ProfileFailure catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -1097,6 +1123,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           if (_serverProfile?.approvalStatus.trim().toUpperCase() ==
+              'PENDING') ...[
+            _pendingApprovalBanner(),
+            const SizedBox(height: 16),
+          ],
+          if (_serverProfile?.approvalStatus.trim().toUpperCase() ==
               'REJECTED') ...[
             _rejectionReasonBanner(),
             const SizedBox(height: 16),
@@ -1152,6 +1183,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   : 'Your profile has been rejected. Please review your details and documents.',
               style: TextStyle(
                 color: Colors.red.shade800,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pendingApprovalBanner() {
+    final message = _profileMessage?.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.shade700, width: 1.4),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: Colors.orange.shade700),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message != null && message.isNotEmpty
+                  ? message
+                  : 'Your profile is currently under review. We will notify you once the compliance review is complete.',
+              style: TextStyle(
+                color: Colors.orange.shade900,
                 fontWeight: FontWeight.w700,
                 height: 1.4,
               ),
@@ -1510,7 +1573,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _fieldLabel(
             'GPhC number (7 digits)',
             preserveCase: true,
-            isRequired: _locumRole == 'Pharmacist',
+            isRequired: _isGphcRequired,
           ),
           _editing
               ? TextField(
