@@ -1473,15 +1473,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           _sectionTitle(Icons.work_outline, 'Professional details'),
           const SizedBox(height: 16),
-          Text(
-            'QUALIFICATIONS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 6),
+          _fieldLabel('Qualifications', isRequired: true),
           _editing
               ? TextField(
                   controller: _qualificationsController,
@@ -1655,7 +1647,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ? _dateField(_dobController)
               : _readOnlyValue(_saved.dateOfBirth),
           const SizedBox(height: 16),
-          _fieldLabel('Gender'),
+          _fieldLabel('Gender', isRequired: true),
           _editing
               ? InputDecorator(
                   decoration: _inputDecoration(),
